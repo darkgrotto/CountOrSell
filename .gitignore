@@ -1,0 +1,26 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.db
+
+# Node
+node_modules/
+dist/
+
+# IDE
+.vs/
+.vscode/
+*.swp
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Capacitor build output
+src/mtghelper-web/android/app/build/
+src/mtghelper-web/ios/App/Pods/
+
+# Images cache
+images/
