@@ -1,8 +1,11 @@
+import { useMemo } from 'react'
 import { Routes, Route, Link } from 'react-router-dom'
+import { TAGLINES } from './taglines'
 import SetList from './components/SetList'
 import SetDetail from './components/SetDetail'
 import ReserveListPage from './components/ReserveListPage'
 import BoostersPage from './components/BoostersPage'
+import SlabbedCardsPage from './components/SlabbedCardsPage'
 import LoginPage from './components/LoginPage'
 import ProtectedRoute from './components/ProtectedRoute'
 import UpdateCheckPanel from './components/UpdateCheckPanel'
@@ -10,6 +13,7 @@ import { useAuth } from './contexts/AuthContext'
 
 function App() {
   const { user, logout } = useAuth()
+  const tagline = useMemo(() => TAGLINES[Math.floor(Math.random() * TAGLINES.length)], [])
 
   return (
     <div className="min-h-screen">
@@ -26,6 +30,7 @@ function App() {
                 <>
                   <Link to="/reservelist" className="hover:text-blue-200">Reserve List</Link>
                   <Link to="/boosters" className="hover:text-blue-200">Boosters</Link>
+                  <Link to="/slabbed" className="hover:text-blue-200">Slabs</Link>
                 </>
               )}
               <UpdateCheckPanel />
@@ -63,12 +68,15 @@ function App() {
           <Route path="/boosters" element={
             <ProtectedRoute><BoostersPage /></ProtectedRoute>
           } />
+          <Route path="/slabbed" element={
+            <ProtectedRoute><SlabbedCardsPage /></ProtectedRoute>
+          } />
         </Routes>
       </main>
 
       <footer className="bg-gray-800 text-gray-400 py-4 mt-8">
         <div className="container mx-auto px-4 text-center text-sm">
-          <p className="mb-1">CountOrSell — Your collection was getting out of hand. We fixed that.</p>
+          <p className="mb-1">CountOrSell — {tagline}</p>
           <p>Data provided by{' '}
           <a
             href="https://scryfall.com"

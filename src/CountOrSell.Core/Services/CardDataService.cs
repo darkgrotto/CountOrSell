@@ -6,6 +6,8 @@ using CountOrSell.Core.Models;
 
 namespace CountOrSell.Core.Services;
 
+public record CardSearchResult(string Id, string Name, string SetCode, string SetName, string CollectorNumber);
+
 public interface ICardDataService
 {
     Task<List<MtgSet>> GetSetsAsync();
@@ -15,6 +17,7 @@ public interface ICardDataService
     Task<string?> GetCardImagePathAsync(string cardId);
     Task<bool> AddTagAsync(string setCode, string tag);
     Task<bool> RemoveTagAsync(string setCode, string tag);
+    Task<List<CardSearchResult>> SearchCardsAsync(string query, int limit = 20);
 }
 
 public class CardDataService : ICardDataService
@@ -124,6 +127,17 @@ public class CardDataService : ICardDataService
         }
 
         return null;
+    }
+
+    public async Task<List<CardSearchResult>> SearchCardsAsync(string query, int limit = 20)
+    {
+        var q = query.ToLowerInvariant();
+        return await _db.CachedCards
+            .Where(c => c.Name.ToLower().Contains(q))
+            .OrderBy(c => c.Name)
+            .Take(limit)
+            .Select(c => new CardSearchResult(c.Id, c.Name, c.SetCode, c.SetName, c.CollectorNumber))
+            .ToListAsync();
     }
 
     private MtgCard MapToMtgCard(Entities.CachedCard cached)

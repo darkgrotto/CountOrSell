@@ -1,6 +1,9 @@
 using System.Text;
 using System.Xml.Linq;
 using Microsoft.EntityFrameworkCore;
+using QuestPDF.Fluent;
+using QuestPDF.Helpers;
+using QuestPDF.Infrastructure;
 using CountOrSell.Core.Data;
 
 namespace CountOrSell.Core.Services;
@@ -11,6 +14,7 @@ public interface IExportService
     Task<byte[]> ExportOwnedCardsAsXmlAsync(string userId);
     Task<byte[]> ExportBoostersAsCsvAsync(string userId);
     Task<byte[]> ExportReserveListAsCsvAsync(string userId);
+    Task<byte[]> ExportSlabbedCardsAsPdfAsync(string userId);
 }
 
 public class ExportService : IExportService
@@ -96,6 +100,74 @@ public class ExportService : IExportService
         }
 
         return Encoding.UTF8.GetBytes(sb.ToString());
+    }
+
+    public async Task<byte[]> ExportSlabbedCardsAsPdfAsync(string userId)
+    {
+        var slabs = await _db.SlabbedCards
+            .Where(s => s.UserId == userId)
+            .OrderBy(s => s.GradingCompany)
+            .ThenByDescending(s => s.Grade)
+            .ThenBy(s => s.CardName)
+            .ToListAsync();
+
+        QuestPDF.Settings.License = LicenseType.Community;
+
+        return Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A4.Landscape());
+                page.Margin(1, Unit.Centimetre);
+
+                page.Header()
+                    .Text("Slabbed Collection")
+                    .Bold()
+                    .FontSize(18);
+
+                page.Content().Table(table =>
+                {
+                    table.ColumnsDefinition(columns =>
+                    {
+                        columns.RelativeColumn(2); // Cert ID
+                        columns.RelativeColumn(4); // Card Name
+                        columns.RelativeColumn(1); // Set
+                        columns.RelativeColumn(2); // Variant
+                        columns.RelativeColumn(1); // Company
+                        columns.RelativeColumn(1); // Grade
+                        columns.RelativeColumn(2); // Date Acquired
+                        columns.RelativeColumn(2); // Price
+                    });
+
+                    table.Header(header =>
+                    {
+                        static IContainer HeaderCell(IContainer c) =>
+                            c.DefaultTextStyle(x => x.Bold()).Padding(5).Background(Colors.Grey.Lighten2);
+
+                        header.Cell().Element(HeaderCell).Text("Cert ID");
+                        header.Cell().Element(HeaderCell).Text("Card Name");
+                        header.Cell().Element(HeaderCell).Text("Set");
+                        header.Cell().Element(HeaderCell).Text("Variant");
+                        header.Cell().Element(HeaderCell).Text("Company");
+                        header.Cell().Element(HeaderCell).Text("Grade");
+                        header.Cell().Element(HeaderCell).Text("Date Acquired");
+                        header.Cell().Element(HeaderCell).Text("Price");
+                    });
+
+                    foreach (var slab in slabs)
+                    {
+                        table.Cell().Padding(5).Text(slab.CertificationNumber);
+                        table.Cell().Padding(5).Text(slab.CardName);
+                        table.Cell().Padding(5).Text(slab.SetCode.ToUpperInvariant());
+                        table.Cell().Padding(5).Text(slab.CardVariant);
+                        table.Cell().Padding(5).Text(slab.GradingCompany);
+                        table.Cell().Padding(5).Text(slab.Grade);
+                        table.Cell().Padding(5).Text(slab.PurchaseDate?.ToString("yyyy-MM-dd") ?? "");
+                        table.Cell().Padding(5).Text(slab.PurchaseCost.HasValue ? $"${slab.PurchaseCost:F2}" : "");
+                    }
+                });
+            });
+        }).GeneratePdf();
     }
 
     private static string EscapeCsv(string value)

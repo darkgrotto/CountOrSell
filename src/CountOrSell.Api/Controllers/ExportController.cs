@@ -46,4 +46,11 @@ public class ExportController : ControllerBase
         var data = await _exportService.ExportReserveListAsCsvAsync(UserId);
         return File(data, "text/csv", "reserve-list.csv");
     }
+
+    [HttpGet("slabbed/pdf")]
+    public async Task<IActionResult> SlabbedPdf()
+    {
+        var bytes = await _exportService.ExportSlabbedCardsAsPdfAsync(UserId);
+        return File(bytes, "application/pdf", "slabbed-collection.pdf");
+    }
 }

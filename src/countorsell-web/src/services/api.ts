@@ -82,6 +82,65 @@ export interface ReserveListCard extends MtgCard {
   owned: boolean
 }
 
+export const GRADING_COMPANIES = ['PSA', 'BGS', 'CGC', 'SGC', 'GAI', 'CSG'] as const
+
+export const CARD_VARIANTS = [
+  'Regular', 'Foil', 'Etched Foil', 'Galaxy Foil', 'Gilded Foil',
+  'Surge Foil', 'Fracture Foil', 'Textured Foil', 'Serialized',
+] as const
+
+export interface SlabbedCard {
+  id: number
+  scryfallCardId: string
+  cardName: string
+  setCode: string
+  setName: string
+  collectorNumber: string
+  cardVariant: string
+  gradingCompany: string
+  grade: string
+  certificationNumber: string
+  purchaseDate: string | null
+  purchasedFrom: string | null
+  purchaseCost: number | null
+  notes: string | null
+  createdAt: string
+}
+
+export interface SlabbedCardRequest {
+  scryfallCardId: string
+  cardName: string
+  setCode: string
+  setName: string
+  collectorNumber: string
+  cardVariant: string
+  gradingCompany: string
+  grade: string
+  certificationNumber: string
+  purchaseDate: string | null
+  purchasedFrom: string | null
+  purchaseCost: number | null
+  notes: string | null
+}
+
+export interface CardSearchResult {
+  id: string
+  name: string
+  setCode: string
+  setName: string
+  collectorNumber: string
+}
+
+export function getCertVerificationUrl(company: string, certNumber: string): string | null {
+  switch (company.toUpperCase()) {
+    case 'PSA': return `https://www.psacard.com/cert/${certNumber}`
+    case 'BGS': return `https://www.beckett.com/grading/cert/${certNumber}`
+    case 'CGC': return `https://www.cgccards.com/certlookup/${certNumber}/`
+    case 'SGC': return `https://www.sgccard.com/cert/${certNumber}`
+    default:    return null
+  }
+}
+
 // =============================================================================
 // API Configuration
 // =============================================================================
@@ -233,6 +292,58 @@ export const api = {
       const error = await response.json().catch(() => ({ error: 'Unknown error' }))
       throw new Error(error.error || `HTTP error ${response.status}`)
     }
+  },
+
+  // --- Slabbed Cards (authorized) ---
+  async fetchSlabbedCards(): Promise<SlabbedCard[]> {
+    const response = await fetch(`${API_BASE}/slabbed`, { headers: getAuthHeaders() })
+    return handleResponse<SlabbedCard[]>(response)
+  },
+
+  async addSlabbedCard(req: SlabbedCardRequest): Promise<SlabbedCard> {
+    const response = await fetch(`${API_BASE}/slabbed`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(req),
+    })
+    return handleResponse<SlabbedCard>(response)
+  },
+
+  async updateSlabbedCard(id: number, req: SlabbedCardRequest): Promise<SlabbedCard> {
+    const response = await fetch(`${API_BASE}/slabbed/${id}`, {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: JSON.stringify(req),
+    })
+    return handleResponse<SlabbedCard>(response)
+  },
+
+  async deleteSlabbedCard(id: number): Promise<void> {
+    const response = await fetch(`${API_BASE}/slabbed/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    })
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+      throw new Error(error.error || `HTTP error ${response.status}`)
+    }
+  },
+
+  async searchCards(q: string): Promise<CardSearchResult[]> {
+    const response = await fetch(`${API_BASE}/cards/search?q=${encodeURIComponent(q)}&limit=20`, {
+      headers: getAuthHeaders(),
+    })
+    return handleResponse<CardSearchResult[]>(response)
+  },
+
+  async downloadSlabbedCardsPdf(): Promise<void> {
+    const response = await fetch(`${API_BASE}/export/slabbed/pdf`, { headers: getAuthHeaders() })
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+      throw new Error(error.error || `HTTP error ${response.status}`)
+    }
+    const blob = await response.blob()
+    this.downloadBlob(blob, 'slabbed-collection.pdf')
   },
 
   // --- Utility ---

@@ -52,6 +52,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ICollectionService, CollectionService>();
 builder.Services.AddScoped<ICardDataService, CardDataService>();
 builder.Services.AddScoped<IExportService, ExportService>();
+builder.Services.AddScoped<ISlabbedCardService, SlabbedCardService>();
 builder.Services.AddSingleton<ILabelService, LabelService>();
 
 var app = builder.Build();

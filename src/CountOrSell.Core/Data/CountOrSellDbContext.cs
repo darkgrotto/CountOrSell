@@ -18,6 +18,7 @@ public class CountOrSellDbContext : DbContext
     public DbSet<DatabaseUpdatePackage> DatabaseUpdatePackages => Set<DatabaseUpdatePackage>();
     public DbSet<UserSubmission> UserSubmissions => Set<UserSubmission>();
     public DbSet<UserSubmissionItem> UserSubmissionItems => Set<UserSubmissionItem>();
+    public DbSet<SlabbedCard> SlabbedCards => Set<SlabbedCard>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -96,6 +97,13 @@ public class CountOrSellDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
         });
+
+        modelBuilder.Entity<SlabbedCard>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => new { e.UserId, e.GradingCompany, e.CertificationNumber }).IsUnique();
+        });
     }
 
     /// <summary>
@@ -115,6 +123,30 @@ public class CountOrSellDbContext : DbContext
             """);
         Database.ExecuteSqlRaw("""
             CREATE INDEX IF NOT EXISTS "IX_SetTags_SetCode" ON "SetTags" ("SetCode")
+            """);
+        Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "SlabbedCards" (
+                "Id"                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                "UserId"              TEXT NOT NULL,
+                "ScryfallCardId"      TEXT NOT NULL,
+                "CardName"            TEXT NOT NULL,
+                "SetCode"             TEXT NOT NULL,
+                "SetName"             TEXT NOT NULL,
+                "CollectorNumber"     TEXT NOT NULL,
+                "CardVariant"         TEXT NOT NULL,
+                "GradingCompany"      TEXT NOT NULL,
+                "Grade"               TEXT NOT NULL,
+                "CertificationNumber" TEXT NOT NULL,
+                "PurchaseDate"        TEXT,
+                "PurchasedFrom"       TEXT,
+                "PurchaseCost"        REAL,
+                "Notes"               TEXT,
+                "CreatedAt"           TEXT NOT NULL,
+                UNIQUE("UserId", "GradingCompany", "CertificationNumber")
+            )
+            """);
+        Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_SlabbedCards_UserId" ON "SlabbedCards" ("UserId")
             """);
     }
 }
