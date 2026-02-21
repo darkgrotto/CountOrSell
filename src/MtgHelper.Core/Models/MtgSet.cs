@@ -30,6 +30,9 @@ public class MtgSet
 
     [JsonPropertyName("search_uri")]
     public string? SearchUri { get; set; }
+
+    [JsonPropertyName("tags")]
+    public List<string> Tags { get; set; } = new();
 }
 
 public class ScryfallSetListResponse

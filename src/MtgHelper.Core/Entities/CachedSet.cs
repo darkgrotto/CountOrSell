@@ -11,4 +11,6 @@ public class CachedSet
     public string? IconSvgUri { get; set; }
     public string? ScryfallUri { get; set; }
     public DateTime LastSyncedAt { get; set; }
+
+    public ICollection<SetTag> Tags { get; set; } = new List<SetTag>();
 }

@@ -15,7 +15,10 @@ var dbOptions = new DbContextOptionsBuilder<MtgHelperDbContext>()
     .Options;
 
 using (var db = new MtgHelperDbContext(dbOptions))
+{
     db.Database.EnsureCreated();
+    db.EnsureSchemaUpToDate();
+}
 
 var scryfallClient = new HttpClient
 {
@@ -81,6 +84,7 @@ syncCommand.SetHandler(async (bool sets, bool cards, string? setCode, bool all) 
             count++;
         }
         await db.SaveChangesAsync();
+        await ApplyAutoTagsAsync(db, scryfallSets);
         Console.WriteLine($"Synced {count} sets.");
 
         if (all)
@@ -122,6 +126,7 @@ syncCommand.SetHandler(async (bool sets, bool cards, string? setCode, bool all) 
             }
         }
         await db.SaveChangesAsync();
+        await ApplyAutoTagsAsync(db, scryfallSets);
         Console.WriteLine($"Synced {scryfallSets.Count} sets.");
     }
 
@@ -319,7 +324,11 @@ publishCommand.SetHandler(async (string outputDir, string? version, string? delt
 
             // Create delta data.db
             var deltaDataDbPath = Path.Combine(deltaTempDir, "data.db");
-            await CreateDeltaDb(deltaSets, deltaCards, deltaDataDbPath);
+            var deltaSetCodes = deltaSets.Select(s => s.Code).ToHashSet();
+            var deltaTags = await db.SetTags.AsNoTracking()
+                .Where(t => deltaSetCodes.Contains(t.SetCode))
+                .ToListAsync();
+            await CreateDeltaDb(deltaSets, deltaCards, deltaTags, deltaDataDbPath);
 
             // Write inner manifest
             var deltaInnerManifest = new
@@ -658,6 +667,36 @@ rootCommand.AddCommand(migrateCommand);
 return await rootCommand.InvokeAsync(args);
 
 // ========== HELPER FUNCTIONS ==========
+
+/// <summary>
+/// For each synced set that has a set_type with a known tag mapping, insert the corresponding
+/// SetTag row if it doesn't already exist. Manually applied tags are never removed.
+/// </summary>
+async Task ApplyAutoTagsAsync(MtgHelperDbContext db, List<MtgSet> sets)
+{
+    var existingTags = (await db.SetTags.ToListAsync())
+        .Select(t => (t.SetCode, t.Tag))
+        .ToHashSet();
+
+    var added = 0;
+    foreach (var s in sets)
+    {
+        var autoTag = KnownSetTags.FromSetType(s.SetType);
+        if (autoTag == null) continue;
+        if (existingTags.Contains((s.Code, autoTag))) continue;
+
+        db.SetTags.Add(new SetTag { SetCode = s.Code, Tag = autoTag });
+        existingTags.Add((s.Code, autoTag));
+        added++;
+    }
+
+    if (added > 0)
+    {
+        await db.SaveChangesAsync();
+        Console.WriteLine($"Auto-tagged {added} set(s) from set_type.");
+    }
+}
+
 async Task<int> SyncCardsForSet(MtgHelperDbContext db, string setCode)
 {
     var cards = await scryfall.GetCardsAsync(setCode.ToLowerInvariant());
@@ -723,6 +762,13 @@ async Task CreateDataOnlyDb(MtgHelperDbContext sourceDb, string outputPath)
                 ScryfallUri TEXT, IsReserved INTEGER NOT NULL, LocalImagePath TEXT,
                 LastSyncedAt TEXT NOT NULL
             );
+            CREATE TABLE SetTags (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                SetCode TEXT NOT NULL,
+                Tag TEXT NOT NULL,
+                UNIQUE(SetCode, Tag),
+                FOREIGN KEY(SetCode) REFERENCES CachedSets(Code) ON DELETE CASCADE
+            );
             """;
         await cmd.ExecuteNonQueryAsync();
     }
@@ -782,10 +828,26 @@ async Task CreateDataOnlyDb(MtgHelperDbContext sourceDb, string outputPath)
         await tx.CommitAsync();
     }
 
-    Console.WriteLine($"  Data DB created: {sets.Count} sets, {cards.Count} cards");
+    // Insert set tags
+    var tags = await sourceDb.SetTags.AsNoTracking().ToListAsync();
+    foreach (var batch in tags.Chunk(500))
+    {
+        using var tx = await conn.BeginTransactionAsync();
+        foreach (var t in batch)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "INSERT OR IGNORE INTO SetTags (SetCode, Tag) VALUES ($code, $tag)";
+            cmd.Parameters.AddWithValue("$code", t.SetCode);
+            cmd.Parameters.AddWithValue("$tag", t.Tag);
+            await cmd.ExecuteNonQueryAsync();
+        }
+        await tx.CommitAsync();
+    }
+
+    Console.WriteLine($"  Data DB created: {sets.Count} sets, {cards.Count} cards, {tags.Count} tags");
 }
 
-async Task CreateDeltaDb(List<CachedSet> deltaSets, List<CachedCard> deltaCards, string outputPath)
+async Task CreateDeltaDb(List<CachedSet> deltaSets, List<CachedCard> deltaCards, List<SetTag> deltaTags, string outputPath)
 {
     using var conn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={outputPath}");
     await conn.OpenAsync();
@@ -805,6 +867,13 @@ async Task CreateDeltaDb(List<CachedSet> deltaSets, List<CachedCard> deltaCards,
                 ImageUrisJson TEXT, CardFacesJson TEXT, PriceUsd TEXT, PriceUsdFoil TEXT,
                 ScryfallUri TEXT, IsReserved INTEGER NOT NULL, LocalImagePath TEXT,
                 LastSyncedAt TEXT NOT NULL
+            );
+            CREATE TABLE SetTags (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                SetCode TEXT NOT NULL,
+                Tag TEXT NOT NULL,
+                UNIQUE(SetCode, Tag),
+                FOREIGN KEY(SetCode) REFERENCES CachedSets(Code) ON DELETE CASCADE
             );
             """;
         await cmd.ExecuteNonQueryAsync();
@@ -861,7 +930,22 @@ async Task CreateDeltaDb(List<CachedSet> deltaSets, List<CachedCard> deltaCards,
         await tx.CommitAsync();
     }
 
-    Console.WriteLine($"  Delta DB created: {deltaSets.Count} sets, {deltaCards.Count} cards");
+    // Insert tags for delta sets
+    foreach (var batch in deltaTags.Chunk(500))
+    {
+        using var tx = await conn.BeginTransactionAsync();
+        foreach (var t in batch)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "INSERT OR IGNORE INTO SetTags (SetCode, Tag) VALUES ($code, $tag)";
+            cmd.Parameters.AddWithValue("$code", t.SetCode);
+            cmd.Parameters.AddWithValue("$tag", t.Tag);
+            await cmd.ExecuteNonQueryAsync();
+        }
+        await tx.CommitAsync();
+    }
+
+    Console.WriteLine($"  Delta DB created: {deltaSets.Count} sets, {deltaCards.Count} cards, {deltaTags.Count} tags");
 }
 
 string? GetImageUrl(CachedCard card)

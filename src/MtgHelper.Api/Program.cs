@@ -56,11 +56,12 @@ builder.Services.AddSingleton<ILabelService, LabelService>();
 
 var app = builder.Build();
 
-// Ensure database is created
+// Ensure database is created and schema is up to date
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<MtgHelperDbContext>();
     db.Database.EnsureCreated();
+    db.EnsureSchemaUpToDate();
 }
 
 // Create images directory

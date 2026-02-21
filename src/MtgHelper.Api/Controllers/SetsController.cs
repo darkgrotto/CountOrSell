@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using MtgHelper.Core.Models;
 using MtgHelper.Core.Services;
 
 namespace MtgHelper.Api.Controllers;
@@ -29,5 +31,36 @@ public class SetsController : ControllerBase
             return NotFound(new { error = $"Set '{setCode}' not found" });
 
         return Ok(set);
+    }
+
+    [HttpGet("tags")]
+    public IActionResult GetKnownTags()
+    {
+        return Ok(KnownSetTags.All.OrderBy(t => t));
+    }
+
+    [Authorize]
+    [HttpPut("{setCode}/tags/{tag}")]
+    public async Task<IActionResult> AddTag(string setCode, string tag)
+    {
+        if (!KnownSetTags.All.Contains(tag))
+            return BadRequest(new { error = $"Unknown tag '{tag}'. Valid tags: {string.Join(", ", KnownSetTags.All.OrderBy(t => t))}" });
+
+        var ok = await _cardDataService.AddTagAsync(setCode, tag);
+        if (!ok)
+            return NotFound(new { error = $"Set '{setCode}' not found" });
+
+        return NoContent();
+    }
+
+    [Authorize]
+    [HttpDelete("{setCode}/tags/{tag}")]
+    public async Task<IActionResult> RemoveTag(string setCode, string tag)
+    {
+        var ok = await _cardDataService.RemoveTagAsync(setCode, tag);
+        if (!ok)
+            return NotFound(new { error = $"Tag '{tag}' not found on set '{setCode}'" });
+
+        return NoContent();
     }
 }

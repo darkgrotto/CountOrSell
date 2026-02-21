@@ -14,6 +14,7 @@ public class MtgHelperDbContext : DbContext
     public DbSet<CardOwnership> CardOwnerships => Set<CardOwnership>();
     public DbSet<CachedSet> CachedSets => Set<CachedSet>();
     public DbSet<CachedCard> CachedCards => Set<CachedCard>();
+    public DbSet<SetTag> SetTags => Set<SetTag>();
     public DbSet<DatabaseUpdatePackage> DatabaseUpdatePackages => Set<DatabaseUpdatePackage>();
     public DbSet<UserSubmission> UserSubmissions => Set<UserSubmission>();
     public DbSet<UserSubmissionItem> UserSubmissionItems => Set<UserSubmissionItem>();
@@ -57,6 +58,17 @@ public class MtgHelperDbContext : DbContext
             entity.HasIndex(e => e.Code).IsUnique();
         });
 
+        modelBuilder.Entity<SetTag>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.SetCode, e.Tag }).IsUnique();
+            entity.HasOne(e => e.Set)
+                  .WithMany(s => s.Tags)
+                  .HasForeignKey(e => e.SetCode)
+                  .HasPrincipalKey(s => s.Code)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<CachedCard>(entity =>
         {
             entity.HasKey(e => e.Id);
@@ -84,5 +96,25 @@ public class MtgHelperDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
         });
+    }
+
+    /// <summary>
+    /// Applies incremental schema changes that EnsureCreated() won't add to an existing database.
+    /// Call this once after EnsureCreated() on every startup.
+    /// </summary>
+    public void EnsureSchemaUpToDate()
+    {
+        Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "SetTags" (
+                "Id"      INTEGER PRIMARY KEY AUTOINCREMENT,
+                "SetCode" TEXT NOT NULL,
+                "Tag"     TEXT NOT NULL,
+                UNIQUE("SetCode", "Tag"),
+                FOREIGN KEY("SetCode") REFERENCES "CachedSets"("Code") ON DELETE CASCADE
+            )
+            """);
+        Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_SetTags_SetCode" ON "SetTags" ("SetCode")
+            """);
     }
 }

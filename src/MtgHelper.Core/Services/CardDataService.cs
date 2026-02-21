@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using MtgHelper.Core.Data;
+using MtgHelper.Core.Entities;
 using MtgHelper.Core.Models;
 
 namespace MtgHelper.Core.Services;
@@ -12,6 +13,8 @@ public interface ICardDataService
     Task<List<MtgCard>> GetCardsForSetAsync(string setCode);
     Task<List<MtgCard>> GetReserveListCardsAsync();
     Task<string?> GetCardImagePathAsync(string cardId);
+    Task<bool> AddTagAsync(string setCode, string tag);
+    Task<bool> RemoveTagAsync(string setCode, string tag);
 }
 
 public class CardDataService : ICardDataService
@@ -36,7 +39,8 @@ public class CardDataService : ICardDataService
                 SetType = s.SetType,
                 CardCount = s.CardCount,
                 IconSvgUri = s.IconSvgUri,
-                ScryfallUri = s.ScryfallUri
+                ScryfallUri = s.ScryfallUri,
+                Tags = s.Tags.Select(t => t.Tag).ToList()
             })
             .ToListAsync();
     }
@@ -44,20 +48,47 @@ public class CardDataService : ICardDataService
     public async Task<MtgSet?> GetSetAsync(string setCode)
     {
         var code = setCode.ToLowerInvariant();
-        var cached = await _db.CachedSets.FirstOrDefaultAsync(s => s.Code == code);
-        if (cached == null) return null;
+        var cached = await _db.CachedSets
+            .Where(s => s.Code == code)
+            .Select(s => new MtgSet
+            {
+                Id = s.Id,
+                Code = s.Code,
+                Name = s.Name,
+                ReleasedAt = s.ReleasedAt,
+                SetType = s.SetType,
+                CardCount = s.CardCount,
+                IconSvgUri = s.IconSvgUri,
+                ScryfallUri = s.ScryfallUri,
+                Tags = s.Tags.Select(t => t.Tag).ToList()
+            })
+            .FirstOrDefaultAsync();
+        return cached;
+    }
 
-        return new MtgSet
-        {
-            Id = cached.Id,
-            Code = cached.Code,
-            Name = cached.Name,
-            ReleasedAt = cached.ReleasedAt,
-            SetType = cached.SetType,
-            CardCount = cached.CardCount,
-            IconSvgUri = cached.IconSvgUri,
-            ScryfallUri = cached.ScryfallUri
-        };
+    public async Task<bool> AddTagAsync(string setCode, string tag)
+    {
+        var code = setCode.ToLowerInvariant();
+        var setExists = await _db.CachedSets.AnyAsync(s => s.Code == code);
+        if (!setExists) return false;
+
+        var alreadyTagged = await _db.SetTags.AnyAsync(t => t.SetCode == code && t.Tag == tag);
+        if (alreadyTagged) return true;
+
+        _db.SetTags.Add(new SetTag { SetCode = code, Tag = tag });
+        await _db.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> RemoveTagAsync(string setCode, string tag)
+    {
+        var code = setCode.ToLowerInvariant();
+        var existing = await _db.SetTags.FirstOrDefaultAsync(t => t.SetCode == code && t.Tag == tag);
+        if (existing == null) return false;
+
+        _db.SetTags.Remove(existing);
+        await _db.SaveChangesAsync();
+        return true;
     }
 
     public async Task<List<MtgCard>> GetCardsForSetAsync(string setCode)
