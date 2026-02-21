@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(chmod:*)",
+      "Bash(bash start.sh)",
+      "Bash(curl:*)",
+      "Bash(netstat:*)",
+      "Bash(ss:*)",
+      "Bash(kill:*)",
+      "Bash(npm install:*)",
+      "Bash(echo:*)",
+      "Bash(bash -c 'npm --version 2>&1; echo \"\"Exit: $?\"\"')",
+      "Bash(bash -c 'npm install --prefix \"\"/c/Users/bcmor/OneDrive/Documents/Code/CountOrSell/src/CountOrSell-web\"\" --silent 2>&1; echo \"\"Exit: $?\"\"')",
+      "Bash(bash -c:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(dotnet build:*)",
+      "Bash(powershell.exe -NoProfile -File \"C:\\\\Users\\\\bcmor\\\\AppData\\\\Local\\\\Temp\\\\rename_cos.ps1\")",
+      "Bash(git mv:*)"
+    ]
+  }
+}

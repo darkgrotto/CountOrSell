@@ -11,9 +11,9 @@ set "SCRIPT_DIR=%~dp0"
 :: Remove trailing backslash
 if "%SCRIPT_DIR:~-1%"=="\" set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
 
-set "API_DIR=%SCRIPT_DIR%\src\MtgHelper.Api"
-set "WEB_DIR=%SCRIPT_DIR%\src\mtghelper-web"
-set "SLN_FILE=%SCRIPT_DIR%\src\MtgHelper.sln"
+set "API_DIR=%SCRIPT_DIR%\src\CountOrSell.Api"
+set "WEB_DIR=%SCRIPT_DIR%\src\CountOrSell-web"
+set "SLN_FILE=%SCRIPT_DIR%\src\CountOrSell.sln"
 set "API_PORT=5000"
 
 :: ── Preflight checks ─────────────────────────────────────────────────────────

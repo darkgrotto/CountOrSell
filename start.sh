@@ -5,8 +5,8 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-API_DIR="$SCRIPT_DIR/src/MtgHelper.Api"
-WEB_DIR="$SCRIPT_DIR/src/mtghelper-web"
+API_DIR="$SCRIPT_DIR/src/CountOrSell.Api"
+WEB_DIR="$SCRIPT_DIR/src/CountOrSell-web"
 
 API_PORT=5000
 API_PID=""
@@ -74,7 +74,7 @@ fi
 # ── API ──────────────────────────────────────────────────────────────────────
 
 log "Restoring .NET packages..."
-dotnet restore "$SCRIPT_DIR/src/MtgHelper.sln" --nologo -v q
+dotnet restore "$SCRIPT_DIR/src/CountOrSell.sln" --nologo -v q
 
 log "Starting API on http://localhost:$API_PORT ..."
 ASPNETCORE_ENVIRONMENT=Development dotnet run \
