@@ -76,7 +76,7 @@ function App() {
 
       <footer className="bg-gray-800 text-gray-400 py-4 mt-8">
         <div className="container mx-auto px-4 text-center text-sm">
-          <p className="mb-1">CountOrSell — {tagline}</p>
+          <p className="mb-1">CountOrSell: {tagline}</p>
           <p>Data provided by{' '}
           <a
             href="https://scryfall.com"
