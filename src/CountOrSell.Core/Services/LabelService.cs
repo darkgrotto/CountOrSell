@@ -105,7 +105,7 @@ public class LabelService : ILabelService
                                         {
                                             text.Span(keyruneSymbol.Value.ToString())
                                                 .FontFamily(KeyruneFontFamily)
-                                                .FontSize(120);
+                                                .FontSize(56);
                                         }
                                         else
                                         {
