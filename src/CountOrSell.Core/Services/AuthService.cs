@@ -14,6 +14,8 @@ public interface IAuthService
     Task<RefreshToken?> ValidateRefreshTokenAsync(string token);
     Task RevokeRefreshTokenAsync(string token);
     Task UpdateLastLoginAsync(string userId);
+    Task<User?> UpdateDisplayNameAsync(string userId, string displayName);
+    Task<bool> ChangePasswordAsync(string userId, string currentPassword, string newPassword);
 }
 
 public class AuthService : IAuthService
@@ -91,5 +93,25 @@ public class AuthService : IAuthService
             user.LastLoginAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
         }
+    }
+
+    public async Task<User?> UpdateDisplayNameAsync(string userId, string displayName)
+    {
+        var user = await _db.Users.FindAsync(userId);
+        if (user == null) return null;
+        user.DisplayName = displayName.Trim();
+        await _db.SaveChangesAsync();
+        return user;
+    }
+
+    public async Task<bool> ChangePasswordAsync(string userId, string currentPassword, string newPassword)
+    {
+        var user = await _db.Users.FindAsync(userId);
+        if (user == null) return false;
+        if (!BCrypt.Net.BCrypt.Verify(currentPassword, user.PasswordHash))
+            throw new InvalidOperationException("Current password is incorrect");
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        await _db.SaveChangesAsync();
+        return true;
     }
 }

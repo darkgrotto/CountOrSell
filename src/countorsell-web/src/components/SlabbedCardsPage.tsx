@@ -71,8 +71,7 @@ export default function SlabbedCardsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['slabbed'] }),
   })
 
-  const [pdfError, setPdfError] = useState<string | null>(null)
-  const [pdfLoading, setPdfLoading] = useState(false)
+
 
   function openAdd() {
     setEditingSlab(null)
@@ -178,18 +177,6 @@ export default function SlabbedCardsPage() {
     }
   }
 
-  async function handleExportPdf() {
-    setPdfLoading(true)
-    setPdfError(null)
-    try {
-      await api.downloadSlabbedCardsPdf()
-    } catch (e: unknown) {
-      setPdfError(e instanceof Error ? e.message : 'Export failed')
-    } finally {
-      setPdfLoading(false)
-    }
-  }
-
   const isSaving = addMutation.isPending || updateMutation.isPending
 
   if (isLoading) {
@@ -223,13 +210,6 @@ export default function SlabbedCardsPage() {
         </div>
         <div className="flex gap-3">
           <button
-            onClick={handleExportPdf}
-            disabled={pdfLoading}
-            className="px-4 py-2 bg-gray-600 hover:bg-gray-500 disabled:opacity-50 text-white rounded-lg"
-          >
-            {pdfLoading ? 'Exporting…' : 'Export PDF'}
-          </button>
-          <button
             onClick={openAdd}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
           >
@@ -237,12 +217,6 @@ export default function SlabbedCardsPage() {
           </button>
         </div>
       </div>
-
-      {pdfError && (
-        <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded">
-          {pdfError}
-        </div>
-      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">

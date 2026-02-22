@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useRef, useEffect } from 'react'
 import { Routes, Route, Link } from 'react-router-dom'
 import { TAGLINES } from './taglines'
 import SetList from './components/SetList'
@@ -7,13 +7,27 @@ import ReserveListPage from './components/ReserveListPage'
 import BoostersPage from './components/BoostersPage'
 import SlabbedCardsPage from './components/SlabbedCardsPage'
 import LoginPage from './components/LoginPage'
+import ProfilePage from './components/ProfilePage'
+import SettingsPage from './components/SettingsPage'
 import ProtectedRoute from './components/ProtectedRoute'
-import UpdateCheckPanel from './components/UpdateCheckPanel'
 import { useAuth } from './contexts/AuthContext'
 
 function App() {
   const { user, logout } = useAuth()
   const tagline = useMemo(() => TAGLINES[Math.floor(Math.random() * TAGLINES.length)], [])
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!dropdownOpen) return
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [dropdownOpen])
 
   return (
     <div className="min-h-screen">
@@ -33,16 +47,39 @@ function App() {
                   <Link to="/slabbed" className="hover:text-blue-200">Slabs</Link>
                 </>
               )}
-              <UpdateCheckPanel />
               {user ? (
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-blue-200">{user.displayName || user.username}</span>
+                <div className="relative" ref={dropdownRef}>
                   <button
-                    onClick={logout}
-                    className="px-3 py-1 bg-blue-600 hover:bg-blue-500 rounded text-sm"
+                    onClick={() => setDropdownOpen(o => !o)}
+                    className="text-sm text-blue-200 hover:text-white flex items-center gap-1"
                   >
-                    Logout
+                    {user.displayName || user.username}
+                    <span className="text-xs opacity-70">▾</span>
                   </button>
+                  {dropdownOpen && (
+                    <div className="absolute right-0 mt-2 bg-white text-gray-900 shadow-lg rounded py-1 min-w-[140px] z-50">
+                      <Link
+                        to="/profile"
+                        onClick={() => setDropdownOpen(false)}
+                        className="block px-4 py-2 text-sm hover:bg-gray-100"
+                      >
+                        Profile
+                      </Link>
+                      <Link
+                        to="/settings"
+                        onClick={() => setDropdownOpen(false)}
+                        className="block px-4 py-2 text-sm hover:bg-gray-100"
+                      >
+                        Settings
+                      </Link>
+                      <button
+                        onClick={() => { logout(); setDropdownOpen(false) }}
+                        className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                      >
+                        Logout
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <Link
@@ -70,6 +107,12 @@ function App() {
           } />
           <Route path="/slabbed" element={
             <ProtectedRoute><SlabbedCardsPage /></ProtectedRoute>
+          } />
+          <Route path="/profile" element={
+            <ProtectedRoute><ProfilePage /></ProtectedRoute>
+          } />
+          <Route path="/settings" element={
+            <ProtectedRoute><SettingsPage /></ProtectedRoute>
           } />
         </Routes>
       </main>

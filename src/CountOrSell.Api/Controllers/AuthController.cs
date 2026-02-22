@@ -28,8 +28,8 @@ public class AuthController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
             return BadRequest(new { error = "Username and password are required" });
 
-        if (request.Password.Length < 6)
-            return BadRequest(new { error = "Password must be at least 6 characters" });
+        if (request.Password.Length < 15)
+            return BadRequest(new { error = "Password must be at least 15 characters" });
 
         var user = await _authService.RegisterAsync(request.Username, request.Password, request.DisplayName);
         if (user == null)
@@ -86,6 +86,43 @@ public class AuthController : ControllerBase
             Username = username ?? "",
             DisplayName = displayName
         });
+    }
+
+    [Authorize]
+    [HttpPut("profile")]
+    public async Task<IActionResult> UpdateProfile([FromBody] UpdateDisplayNameRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.DisplayName))
+            return BadRequest(new { error = "Display name cannot be blank" });
+
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+        var user = await _authService.UpdateDisplayNameAsync(userId, request.DisplayName);
+        if (user == null) return NotFound();
+
+        return Ok(new UserInfo { Id = user.Id, Username = user.Username, DisplayName = user.DisplayName });
+    }
+
+    [Authorize]
+    [HttpPut("password")]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.CurrentPassword) || string.IsNullOrWhiteSpace(request.NewPassword))
+            return BadRequest(new { error = "All password fields are required" });
+        if (request.NewPassword.Length < 15)
+            return BadRequest(new { error = "Password must be at least 15 characters" });
+        if (request.CurrentPassword == request.NewPassword)
+            return BadRequest(new { error = "New password must be different from current password" });
+
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+        try
+        {
+            await _authService.ChangePasswordAsync(userId, request.CurrentPassword, request.NewPassword);
+            return Ok(new { message = "Password changed successfully" });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
     }
 
     private async Task<AuthResponse> GenerateAuthResponse(string userId, string username, string? displayName)

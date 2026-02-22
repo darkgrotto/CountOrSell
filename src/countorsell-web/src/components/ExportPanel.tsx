@@ -3,9 +3,10 @@ import { getAuthHeaders } from '../services/auth';
 
 interface ExportPanelProps {
   type: 'cards' | 'boosters' | 'reservelist';
+  title?: string;
 }
 
-export default function ExportPanel({ type }: ExportPanelProps) {
+export default function ExportPanel({ type, title = 'Export' }: ExportPanelProps) {
   const [isDownloading, setIsDownloading] = useState(false);
 
   const handleExport = async (format: 'csv' | 'xml') => {
@@ -52,7 +53,7 @@ export default function ExportPanel({ type }: ExportPanelProps) {
 
   return (
     <div className="bg-white rounded-lg shadow p-4">
-      <h3 className="text-lg font-semibold mb-3">Export</h3>
+      <h3 className="text-lg font-semibold mb-3">{title}</h3>
       <div className="flex gap-2">
         <button
           onClick={() => handleExport('csv')}

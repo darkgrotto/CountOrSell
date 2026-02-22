@@ -55,3 +55,18 @@ public class UserInfo
     [JsonPropertyName("displayName")]
     public string? DisplayName { get; set; }
 }
+
+public class UpdateDisplayNameRequest
+{
+    [JsonPropertyName("displayName")]
+    public string DisplayName { get; set; } = string.Empty;
+}
+
+public class ChangePasswordRequest
+{
+    [JsonPropertyName("currentPassword")]
+    public string CurrentPassword { get; set; } = string.Empty;
+
+    [JsonPropertyName("newPassword")]
+    public string NewPassword { get; set; } = string.Empty;
+}

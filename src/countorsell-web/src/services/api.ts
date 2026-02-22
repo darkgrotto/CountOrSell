@@ -346,6 +346,28 @@ export const api = {
     this.downloadBlob(blob, 'slabbed-collection.pdf')
   },
 
+  // --- Auth Profile (authorized) ---
+  async updateDisplayName(displayName: string): Promise<{ id: string; username: string; displayName?: string }> {
+    const res = await fetch(`${API_BASE}/auth/profile`, {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: JSON.stringify({ displayName }),
+    })
+    return handleResponse(res)
+  },
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    const res = await fetch(`${API_BASE}/auth/password`, {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: JSON.stringify({ currentPassword, newPassword }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: 'Unknown error' }))
+      throw new Error(body.error || `HTTP error ${res.status}`)
+    }
+  },
+
   // --- Utility ---
   downloadBlob(blob: Blob, filename: string) {
     const url = URL.createObjectURL(blob)
