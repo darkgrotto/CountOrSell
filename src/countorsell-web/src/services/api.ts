@@ -131,6 +131,16 @@ export interface CardSearchResult {
   collectorNumber: string
 }
 
+export interface AdminUserInfo {
+  id: string
+  username: string
+  displayName?: string
+  isAdmin: boolean
+  isDisabled: boolean
+  createdAt: string
+  lastLoginAt: string | null
+}
+
 export function getCertVerificationUrl(company: string, certNumber: string): string | null {
   switch (company.toUpperCase()) {
     case 'PSA': return `https://www.psacard.com/cert/${certNumber}`
@@ -361,6 +371,32 @@ export const api = {
       method: 'PUT',
       headers: authHeaders(),
       body: JSON.stringify({ currentPassword, newPassword }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: 'Unknown error' }))
+      throw new Error(body.error || `HTTP error ${res.status}`)
+    }
+  },
+
+  // --- Admin (admin only) ---
+  async listUsers(): Promise<AdminUserInfo[]> {
+    const res = await fetch(`${API_BASE}/admin/users`, { headers: getAuthHeaders() })
+    return handleResponse<AdminUserInfo[]>(res)
+  },
+
+  async adminUpdateUser(id: string, update: { displayName?: string; isAdmin?: boolean; isDisabled?: boolean }): Promise<AdminUserInfo> {
+    const res = await fetch(`${API_BASE}/admin/users/${id}`, {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: JSON.stringify(update),
+    })
+    return handleResponse<AdminUserInfo>(res)
+  },
+
+  async adminDeleteUser(id: string): Promise<void> {
+    const res = await fetch(`${API_BASE}/admin/users/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
     })
     if (!res.ok) {
       const body = await res.json().catch(() => ({ error: 'Unknown error' }))

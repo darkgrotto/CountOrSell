@@ -54,6 +54,45 @@ public class UserInfo
 
     [JsonPropertyName("displayName")]
     public string? DisplayName { get; set; }
+
+    [JsonPropertyName("isAdmin")]
+    public bool IsAdmin { get; set; }
+}
+
+public class AdminUserInfo
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
+
+    [JsonPropertyName("username")]
+    public string Username { get; set; } = string.Empty;
+
+    [JsonPropertyName("displayName")]
+    public string? DisplayName { get; set; }
+
+    [JsonPropertyName("isAdmin")]
+    public bool IsAdmin { get; set; }
+
+    [JsonPropertyName("isDisabled")]
+    public bool IsDisabled { get; set; }
+
+    [JsonPropertyName("createdAt")]
+    public DateTime CreatedAt { get; set; }
+
+    [JsonPropertyName("lastLoginAt")]
+    public DateTime? LastLoginAt { get; set; }
+}
+
+public class AdminUpdateUserRequest
+{
+    [JsonPropertyName("displayName")]
+    public string? DisplayName { get; set; }
+
+    [JsonPropertyName("isAdmin")]
+    public bool? IsAdmin { get; set; }
+
+    [JsonPropertyName("isDisabled")]
+    public bool? IsDisabled { get; set; }
 }
 
 public class UpdateDisplayNameRequest

@@ -6,6 +6,7 @@ export interface UserInfo {
   id: string;
   username: string;
   displayName?: string;
+  isAdmin?: boolean;
 }
 
 interface AuthContextType {
@@ -154,7 +155,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const updateProfile = async (displayName: string) => {
     const updated = await api.updateDisplayName(displayName);
-    setUser(updated);
+    setUser(prev => prev ? { ...prev, displayName: updated.displayName } : null);
   };
 
   return (

@@ -148,5 +148,9 @@ public class CountOrSellDbContext : DbContext
         Database.ExecuteSqlRaw("""
             CREATE INDEX IF NOT EXISTS "IX_SlabbedCards_UserId" ON "SlabbedCards" ("UserId")
             """);
+
+        // Add IsAdmin / IsDisabled columns to existing databases
+        try { Database.ExecuteSqlRaw("ALTER TABLE Users ADD COLUMN IsAdmin INTEGER NOT NULL DEFAULT 0"); } catch { }
+        try { Database.ExecuteSqlRaw("ALTER TABLE Users ADD COLUMN IsDisabled INTEGER NOT NULL DEFAULT 0"); } catch { }
     }
 }

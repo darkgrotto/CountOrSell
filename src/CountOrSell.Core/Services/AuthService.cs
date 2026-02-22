@@ -16,6 +16,9 @@ public interface IAuthService
     Task UpdateLastLoginAsync(string userId);
     Task<User?> UpdateDisplayNameAsync(string userId, string displayName);
     Task<bool> ChangePasswordAsync(string userId, string currentPassword, string newPassword);
+    Task<List<User>> GetAllUsersAsync();
+    Task<User?> AdminUpdateUserAsync(string targetUserId, string? displayName, bool? isAdmin, bool? isDisabled);
+    Task<bool> AdminDeleteUserAsync(string targetUserId);
 }
 
 public class AuthService : IAuthService
@@ -49,8 +52,9 @@ public class AuthService : IAuthService
     {
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Username == username.ToLowerInvariant());
         if (user == null) return null;
-
-        return BCrypt.Net.BCrypt.Verify(password, user.PasswordHash) ? user : null;
+        if (!BCrypt.Net.BCrypt.Verify(password, user.PasswordHash)) return null;
+        if (user.IsDisabled) throw new InvalidOperationException("Account has been disabled. Contact an administrator.");
+        return user;
     }
 
     public async Task<RefreshToken> CreateRefreshTokenAsync(string userId)
@@ -111,6 +115,31 @@ public class AuthService : IAuthService
         if (!BCrypt.Net.BCrypt.Verify(currentPassword, user.PasswordHash))
             throw new InvalidOperationException("Current password is incorrect");
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        await _db.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<List<User>> GetAllUsersAsync()
+    {
+        return await _db.Users.OrderBy(u => u.Username).ToListAsync();
+    }
+
+    public async Task<User?> AdminUpdateUserAsync(string targetUserId, string? displayName, bool? isAdmin, bool? isDisabled)
+    {
+        var user = await _db.Users.FindAsync(targetUserId);
+        if (user == null) return null;
+        if (displayName != null) user.DisplayName = displayName.Trim();
+        if (isAdmin.HasValue) user.IsAdmin = isAdmin.Value;
+        if (isDisabled.HasValue) user.IsDisabled = isDisabled.Value;
+        await _db.SaveChangesAsync();
+        return user;
+    }
+
+    public async Task<bool> AdminDeleteUserAsync(string targetUserId)
+    {
+        var user = await _db.Users.FindAsync(targetUserId);
+        if (user == null) return false;
+        _db.Users.Remove(user);
         await _db.SaveChangesAsync();
         return true;
     }

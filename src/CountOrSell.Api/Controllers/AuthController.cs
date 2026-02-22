@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
+using CountOrSell.Core.Entities;
 using CountOrSell.Core.Models;
 using CountOrSell.Core.Services;
 
@@ -15,11 +16,13 @@ public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
     private readonly IConfiguration _config;
+    private readonly CountOrSell.Core.Data.CountOrSellDbContext _db;
 
-    public AuthController(IAuthService authService, IConfiguration config)
+    public AuthController(IAuthService authService, IConfiguration config, CountOrSell.Core.Data.CountOrSellDbContext db)
     {
         _authService = authService;
         _config = config;
+        _db = db;
     }
 
     [HttpPost("register")]
@@ -35,19 +38,27 @@ public class AuthController : ControllerBase
         if (user == null)
             return Conflict(new { error = "Username already exists" });
 
-        var response = await GenerateAuthResponse(user.Id, user.Username, user.DisplayName);
+        var response = await GenerateAuthResponse(user.Id, user.Username, user.DisplayName, user.IsAdmin);
         return Ok(response);
     }
 
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
-        var user = await _authService.ValidateCredentialsAsync(request.Username, request.Password);
+        User? user;
+        try
+        {
+            user = await _authService.ValidateCredentialsAsync(request.Username, request.Password);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Unauthorized(new { error = ex.Message });
+        }
         if (user == null)
             return Unauthorized(new { error = "Invalid username or password" });
 
         await _authService.UpdateLastLoginAsync(user.Id);
-        var response = await GenerateAuthResponse(user.Id, user.Username, user.DisplayName);
+        var response = await GenerateAuthResponse(user.Id, user.Username, user.DisplayName, user.IsAdmin);
         return Ok(response);
     }
 
@@ -58,33 +69,33 @@ public class AuthController : ControllerBase
         if (refreshToken == null)
             return Unauthorized(new { error = "Invalid or expired refresh token" });
 
-        // Revoke old token and issue new one
         await _authService.RevokeRefreshTokenAsync(request.RefreshToken);
 
-        // Look up user info from the database
-        using var scope = HttpContext.RequestServices.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CountOrSell.Core.Data.CountOrSellDbContext>();
-        var user = await db.Users.FindAsync(refreshToken.UserId);
+        var user = await _db.Users.FindAsync(refreshToken.UserId);
         if (user == null)
             return Unauthorized(new { error = "User not found" });
 
-        var response = await GenerateAuthResponse(user.Id, user.Username, user.DisplayName);
+        if (user.IsDisabled)
+            return Unauthorized(new { error = "Account has been disabled. Contact an administrator." });
+
+        var response = await GenerateAuthResponse(user.Id, user.Username, user.DisplayName, user.IsAdmin);
         return Ok(response);
     }
 
     [Authorize]
     [HttpGet("me")]
-    public IActionResult Me()
+    public async Task<IActionResult> Me()
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var username = User.FindFirstValue(ClaimTypes.Name);
-        var displayName = User.FindFirstValue("DisplayName");
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+        var user = await _db.Users.FindAsync(userId);
+        if (user == null) return Unauthorized();
 
         return Ok(new UserInfo
         {
-            Id = userId ?? "",
-            Username = username ?? "",
-            DisplayName = displayName
+            Id = user.Id,
+            Username = user.Username,
+            DisplayName = user.DisplayName,
+            IsAdmin = user.IsAdmin,
         });
     }
 
@@ -99,7 +110,7 @@ public class AuthController : ControllerBase
         var user = await _authService.UpdateDisplayNameAsync(userId, request.DisplayName);
         if (user == null) return NotFound();
 
-        return Ok(new UserInfo { Id = user.Id, Username = user.Username, DisplayName = user.DisplayName });
+        return Ok(new UserInfo { Id = user.Id, Username = user.Username, DisplayName = user.DisplayName, IsAdmin = user.IsAdmin });
     }
 
     [Authorize]
@@ -125,7 +136,7 @@ public class AuthController : ControllerBase
         }
     }
 
-    private async Task<AuthResponse> GenerateAuthResponse(string userId, string username, string? displayName)
+    private async Task<AuthResponse> GenerateAuthResponse(string userId, string username, string? displayName, bool isAdmin = false)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -136,7 +147,8 @@ public class AuthController : ControllerBase
         {
             new Claim(ClaimTypes.NameIdentifier, userId),
             new Claim(ClaimTypes.Name, username),
-            new Claim("DisplayName", displayName ?? username)
+            new Claim("DisplayName", displayName ?? username),
+            new Claim("IsAdmin", isAdmin.ToString().ToLower())
         };
 
         var token = new JwtSecurityToken(
@@ -158,7 +170,8 @@ public class AuthController : ControllerBase
             {
                 Id = userId,
                 Username = username,
-                DisplayName = displayName
+                DisplayName = displayName,
+                IsAdmin = isAdmin,
             }
         };
     }

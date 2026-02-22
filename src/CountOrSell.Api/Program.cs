@@ -82,6 +82,20 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<CountOrSellDbContext>();
     db.Database.EnsureCreated();
     db.EnsureSchemaUpToDate();
+
+    // Seed default admin user if it doesn't exist
+    if (!db.Users.Any(u => u.Username == "cosadm"))
+    {
+        db.Users.Add(new CountOrSell.Core.Entities.User
+        {
+            Username = "cosadm",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("wholeftjaceinchargeofdesign"),
+            DisplayName = "Admin",
+            IsAdmin = true,
+            CreatedAt = DateTime.UtcNow,
+        });
+        db.SaveChanges();
+    }
 }
 
 

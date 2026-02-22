@@ -9,7 +9,9 @@ import SlabbedCardsPage from './components/SlabbedCardsPage'
 import LoginPage from './components/LoginPage'
 import ProfilePage from './components/ProfilePage'
 import SettingsPage from './components/SettingsPage'
+import AdminPage from './components/AdminPage'
 import ProtectedRoute from './components/ProtectedRoute'
+import AdminRoute from './components/AdminRoute'
 import { useAuth } from './contexts/AuthContext'
 
 function App() {
@@ -72,6 +74,15 @@ function App() {
                       >
                         Settings
                       </Link>
+                      {user.isAdmin && (
+                        <Link
+                          to="/admin"
+                          onClick={() => setDropdownOpen(false)}
+                          className="block px-4 py-2 text-sm hover:bg-gray-100"
+                        >
+                          Admin
+                        </Link>
+                      )}
                       <button
                         onClick={() => { logout(); setDropdownOpen(false) }}
                         className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
@@ -113,6 +124,9 @@ function App() {
           } />
           <Route path="/settings" element={
             <ProtectedRoute><SettingsPage /></ProtectedRoute>
+          } />
+          <Route path="/admin" element={
+            <AdminRoute><AdminPage /></AdminRoute>
           } />
         </Routes>
       </main>
