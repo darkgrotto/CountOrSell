@@ -81,6 +81,13 @@ dotnet run --project src/CountOrSell.Cli -- images --set-code mh3
 dotnet run --project src/CountOrSell.Cli -- images --all
 ```
 
+### 5. Default Admin
+
+There is a default user built into the system with username 'cosadm' and password 'wholeftjaceinchargeofdesign'
+
+** YOU SHOULD IMMEDIATELY LOGIN AND CHANGE THIS PASSWORD **
+
+Once the password has been changed, you may either create a regular user account and promote that to admin permssions or continue using the 'cosadm' account.
 
 ---
 
