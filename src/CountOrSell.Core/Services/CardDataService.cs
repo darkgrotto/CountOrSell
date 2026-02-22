@@ -23,11 +23,13 @@ public interface ICardDataService
 public class CardDataService : ICardDataService
 {
     private readonly CountOrSellDbContext _db;
+    private readonly string _imagesRoot;
     private readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
 
-    public CardDataService(CountOrSellDbContext db)
+    public CardDataService(CountOrSellDbContext db, string imagesRoot)
     {
         _db = db;
+        _imagesRoot = imagesRoot;
     }
 
     public async Task<List<MtgSet>> GetSetsAsync()
@@ -121,7 +123,7 @@ public class CardDataService : ICardDataService
 
         if (!string.IsNullOrEmpty(card.LocalImagePath))
         {
-            var fullPath = Path.Combine(AppContext.BaseDirectory, card.LocalImagePath);
+            var fullPath = Path.Combine(_imagesRoot, card.LocalImagePath);
             if (File.Exists(fullPath))
                 return fullPath;
         }

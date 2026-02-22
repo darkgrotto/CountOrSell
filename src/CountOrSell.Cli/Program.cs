@@ -9,7 +9,24 @@ using CountOrSell.Core.Entities;
 using CountOrSell.Core.Models;
 
 // --- Shared setup ---
-var dbPath = Path.Combine(AppContext.BaseDirectory, "CountOrSell.db");
+static string FindRepoRoot()
+{
+    var dir = new DirectoryInfo(AppContext.BaseDirectory);
+    while (dir != null)
+    {
+        if (Directory.Exists(Path.Combine(dir.FullName, ".git")))
+            return dir.FullName;
+        dir = dir.Parent;
+    }
+    throw new InvalidOperationException("Could not find repository root (.git directory).");
+}
+
+var repoRoot   = FindRepoRoot();
+var dbPath     = Path.Combine(repoRoot, "src", "CountOrSell.Api", "database", "CountOrSell.db");
+var imagesRoot = Path.Combine(repoRoot, "src", "CountOrSell.Api", "images");
+Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
+Directory.CreateDirectory(imagesRoot);
+
 var dbOptions = new DbContextOptionsBuilder<CountOrSellDbContext>()
     .UseSqlite($"Data Source={dbPath}")
     .Options;
@@ -89,9 +106,9 @@ syncCommand.SetHandler(async (bool sets, bool cards, string? setCode, bool all) 
 
         if (all)
         {
-            var syncedSetCodes = await db.CachedCards.Select(c => c.SetCode).Distinct().ToListAsync();
-            Console.WriteLine($"Syncing cards for {syncedSetCodes.Count} previously cached sets...");
-            foreach (var code in syncedSetCodes)
+            var allSetCodes = await db.CachedSets.Where(s => s.CardCount > 0).Select(s => s.Code).ToListAsync();
+            Console.WriteLine($"Syncing cards for {allSetCodes.Count} sets...");
+            foreach (var code in allSetCodes)
             {
                 var cardCount = await SyncCardsForSet(db, code);
                 Console.WriteLine($"  {code}: {cardCount} cards");
@@ -162,8 +179,6 @@ imagesCommand.AddOption(imgMissingOption);
 imagesCommand.SetHandler(async (string? setCode, bool all, bool missingOnly) =>
 {
     using var db = new CountOrSellDbContext(dbOptions);
-    var imagesDir = Path.Combine(AppContext.BaseDirectory, "images");
-    Directory.CreateDirectory(imagesDir);
 
     IQueryable<CachedCard> query = db.CachedCards;
     if (setCode != null) query = query.Where(c => c.SetCode == setCode.ToLowerInvariant());
@@ -178,8 +193,10 @@ imagesCommand.SetHandler(async (string? setCode, bool all, bool missingOnly) =>
         var imageUrl = GetImageUrl(card);
         if (imageUrl == null) continue;
 
-        var relativePath = Path.Combine("images", $"{card.Id}.jpg");
-        var absolutePath = Path.Combine(AppContext.BaseDirectory, relativePath);
+        var setDir      = Path.Combine(imagesRoot, card.SetCode);
+        Directory.CreateDirectory(setDir);
+        var relativePath = Path.Combine(card.SetCode, $"{card.Id}.jpg");
+        var absolutePath = Path.Combine(imagesRoot, relativePath);
 
         if (missingOnly && File.Exists(absolutePath))
         {
@@ -243,6 +260,7 @@ publishCommand.SetHandler(async (string outputDir, string? version, string? delt
         // Create a clean data.db with only CachedSets and CachedCards
         var fullDataDbPath = Path.Combine(fullTempDir, "data.db");
         await CreateDataOnlyDb(db, fullDataDbPath);
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
 
         // Write inner manifest
         var innerManifest = new { version = ver, type = "full", setCount, cardCount, createdAt = DateTime.UtcNow };
@@ -272,6 +290,7 @@ publishCommand.SetHandler(async (string outputDir, string? version, string? delt
     }
     finally
     {
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
         Directory.Delete(fullTempDir, true);
     }
 
@@ -329,6 +348,7 @@ publishCommand.SetHandler(async (string outputDir, string? version, string? delt
                 .Where(t => deltaSetCodes.Contains(t.SetCode))
                 .ToListAsync();
             await CreateDeltaDb(deltaSets, deltaCards, deltaTags, deltaDataDbPath);
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
 
             // Write inner manifest
             var deltaInnerManifest = new
@@ -363,6 +383,7 @@ publishCommand.SetHandler(async (string outputDir, string? version, string? delt
         }
         finally
         {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
             Directory.Delete(deltaTempDir, true);
         }
     }

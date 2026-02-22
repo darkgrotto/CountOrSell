@@ -39,8 +39,26 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 builder.Services.AddAuthorization();
 
+// Fixed data paths (relative to repo root)
+static string FindRepoRoot()
+{
+    var dir = new DirectoryInfo(AppContext.BaseDirectory);
+    while (dir != null)
+    {
+        if (Directory.Exists(Path.Combine(dir.FullName, ".git")))
+            return dir.FullName;
+        dir = dir.Parent;
+    }
+    throw new InvalidOperationException("Could not find repository root (.git directory).");
+}
+
+var repoRoot   = FindRepoRoot();
+var dbPath     = Path.Combine(repoRoot, "src", "CountOrSell.Api", "database", "CountOrSell.db");
+var imagesRoot = Path.Combine(repoRoot, "src", "CountOrSell.Api", "images");
+Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
+Directory.CreateDirectory(imagesRoot);
+
 // SQLite database
-var dbPath = Path.Combine(AppContext.BaseDirectory, "CountOrSell.db");
 builder.Services.AddDbContext<CountOrSellDbContext>(options =>
     options.UseSqlite($"Data Source={dbPath}"));
 
@@ -50,7 +68,8 @@ builder.Services.AddHttpClient();
 // Services
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ICollectionService, CollectionService>();
-builder.Services.AddScoped<ICardDataService, CardDataService>();
+builder.Services.AddScoped<ICardDataService>(sp =>
+    new CardDataService(sp.GetRequiredService<CountOrSellDbContext>(), imagesRoot));
 builder.Services.AddScoped<IExportService, ExportService>();
 builder.Services.AddScoped<ISlabbedCardService, SlabbedCardService>();
 builder.Services.AddSingleton<ILabelService, LabelService>();
@@ -65,8 +84,6 @@ using (var scope = app.Services.CreateScope())
     db.EnsureSchemaUpToDate();
 }
 
-// Create images directory
-Directory.CreateDirectory(Path.Combine(AppContext.BaseDirectory, "images"));
 
 if (app.Environment.IsDevelopment())
 {
