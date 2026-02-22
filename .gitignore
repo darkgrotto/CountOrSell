@@ -4,6 +4,7 @@ obj/
 *.user
 *.suo
 *.db
+!src/CountOrSell.Api/database/*.db
 
 # Node
 node_modules/
@@ -22,5 +23,7 @@ Thumbs.db
 src/mtghelper-web/android/app/build/
 src/mtghelper-web/ios/App/Pods/
 
-# Images cache
+# Images cache (except the fixed API images directory)
 images/
+!src/CountOrSell.Api/images/
+!src/CountOrSell.Api/images/**
