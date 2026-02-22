@@ -1,1 +1,2 @@
 src/CountOrSell.Api/database/*.db filter=lfs diff=lfs merge=lfs -text
+src/CountOrSell.Api/images/**/*.jpg filter=lfs diff=lfs merge=lfs -text

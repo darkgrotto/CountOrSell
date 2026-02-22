@@ -27,3 +27,5 @@ src/mtghelper-web/ios/App/Pods/
 images/
 !src/CountOrSell.Api/images/
 !src/CountOrSell.Api/images/**
+# "con" is a Windows reserved device name — cannot be staged by git on Windows
+src/CountOrSell.Api/images/con/
