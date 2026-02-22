@@ -99,12 +99,15 @@ dotnet run --project src/CountOrSell.Cli -- images --all
 ## Tech Stack
 
 **Backend**
+
 .NET 8, ASP.NET Core, Entity Framework Core, SQLite, QuestPDF, BCrypt.Net
 
 **Frontend**
+
 React 18, TypeScript, Vite, TanStack Query, React Router, Tailwind CSS
 
 **Mobile**
+
 Capacitor (iOS / Android shells, optional)
 
 **Data**
