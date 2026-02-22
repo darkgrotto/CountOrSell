@@ -399,7 +399,12 @@ export default function CardGrid({ cards, reservedCardIds = [], ownedCardIds = [
         </div>
       )}
 
-      <CardDetailModal card={selectedCard} onClose={() => setSelectedCard(null)} />
+      <CardDetailModal
+        card={selectedCard}
+        onClose={() => setSelectedCard(null)}
+        isOwned={selectedCard ? ownedSet.has(selectedCard.id) : false}
+        onToggleOwned={onToggleOwned && selectedCard ? () => onToggleOwned(selectedCard) : undefined}
+      />
     </div>
   )
 }

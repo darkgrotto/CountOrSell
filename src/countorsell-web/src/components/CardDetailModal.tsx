@@ -4,6 +4,8 @@ import { MtgCard } from '../services/api'
 interface CardDetailModalProps {
   card: MtgCard | null
   onClose: () => void
+  isOwned?: boolean
+  onToggleOwned?: () => void
 }
 
 const COLOR_STYLES: Record<string, string> = {
@@ -32,7 +34,7 @@ const getRarityBadge = (rarity: string): string => {
   }
 }
 
-export default function CardDetailModal({ card, onClose }: CardDetailModalProps) {
+export default function CardDetailModal({ card, onClose, isOwned, onToggleOwned }: CardDetailModalProps) {
   useEffect(() => {
     if (!card) return
     const handleKey = (e: KeyboardEvent) => {
@@ -167,10 +169,24 @@ export default function CardDetailModal({ card, onClose }: CardDetailModalProps)
             </a>
           )}
 
+          {/* Add to Collection */}
+          {onToggleOwned && (
+            <button
+              onClick={onToggleOwned}
+              className={`mt-4 w-full py-2 rounded-lg text-sm font-medium transition-colors ${
+                isOwned
+                  ? 'bg-green-100 hover:bg-green-200 text-green-800'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+              }`}
+            >
+              {isOwned ? '✓ In Collection' : '+ Add to Collection'}
+            </button>
+          )}
+
           {/* Close Button */}
           <button
             onClick={onClose}
-            className="mt-4 w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm transition-colors"
+            className="mt-2 w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm transition-colors"
           >
             Close
           </button>

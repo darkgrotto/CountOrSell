@@ -14,10 +14,11 @@
 // =============================================================================
 
 import { useState, useRef } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { api, MtgSet, CardSearchResult } from '../services/api'
+import { api, MtgSet, MtgCard, CardSearchResult } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
+import CardDetailModal from './CardDetailModal'
 
 /**
  * SetList Component
@@ -67,6 +68,39 @@ export default function SetList() {
   const [cardResults, setCardResults] = useState<CardSearchResult[]>([])
   const [cardSearching, setCardSearching] = useState(false)
   const cardTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Selected card from search results — drives the detail modal
+  const [selectedResult, setSelectedResult] = useState<CardSearchResult | null>(null)
+
+  const queryClient = useQueryClient()
+
+  // Fetch all cards for the selected result's set (React Query caches this, so
+  // navigating back to a previously viewed set is instant)
+  const { data: selectedSetCards } = useQuery({
+    queryKey: ['cards', selectedResult?.setCode],
+    queryFn: () => api.getCards(selectedResult!.setCode),
+    enabled: !!selectedResult,
+  })
+
+  // Fetch owned card IDs for the selected result's set
+  const { data: selectedSetOwned = [] } = useQuery({
+    queryKey: ['owned-cards', selectedResult?.setCode],
+    queryFn: () => api.getOwnedCardsForSet(selectedResult!.setCode),
+    enabled: !!selectedResult && !!user,
+  })
+
+  const toggleSelectedOwned = useMutation({
+    mutationFn: (card: MtgCard) => {
+      const isOwned = selectedSetOwned.includes(card.id)
+      return api.setCardOwned(card.id, !isOwned, card.name, card.set, card.collector_number)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['owned-cards', selectedResult?.setCode] })
+    },
+  })
+
+  // Resolve the full MtgCard object once selectedSetCards has loaded
+  const selectedFullCard = selectedSetCards?.find(c => c.id === selectedResult?.id) ?? null
 
   // ===========================================================================
   // Data Fetching with React Query
@@ -367,10 +401,10 @@ export default function SetList() {
           {!cardSearching && cardResults.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {cardResults.map(r => (
-                <Link
+                <button
                   key={`${r.id}-${r.setCode}`}
-                  to={`/sets/${r.setCode}`}
-                  className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow p-4"
+                  onClick={() => setSelectedResult(r)}
+                  className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow p-4 text-left w-full"
                 >
                   <h3 className="font-semibold text-lg">{r.name}</h3>
                   <div className="text-sm text-gray-600 flex items-center gap-2 mt-1">
@@ -379,7 +413,7 @@ export default function SetList() {
                     <span>#{r.collectorNumber}</span>
                   </div>
                   <div className="text-xs text-gray-500 mt-1">{r.setName}</div>
-                </Link>
+                </button>
               ))}
             </div>
           )}
@@ -399,6 +433,14 @@ export default function SetList() {
           )}
         </div>
       )}
+
+      {/* Card detail modal for search results */}
+      <CardDetailModal
+        card={selectedFullCard}
+        onClose={() => setSelectedResult(null)}
+        isOwned={selectedResult ? selectedSetOwned.includes(selectedResult.id) : false}
+        onToggleOwned={user && selectedFullCard ? () => toggleSelectedOwned.mutate(selectedFullCard) : undefined}
+      />
     </div>
   )
 }
