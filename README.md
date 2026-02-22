@@ -56,7 +56,7 @@ Both scripts start the API on `http://localhost:5000` and the frontend dev serve
 
 ### 3. Populate the database (first time only)
 
-The database starts empty. Use the CLI to pull data from Scryfall:
+The database starts empty. Use the synchronize from user interface to pull a clean copy.  If you'd prefer to build it yourself (without customizations/user content from the maintained database) you can use the CLI to pull data from Scryfall:
 
 ```bash
 # Sync all sets (fast, no cards yet)
@@ -68,6 +68,19 @@ dotnet run --project src/CountOrSell.Cli -- sync --set-code mh3
 # Or sync everything at once (slow, ~30 min for all sets + cards)
 dotnet run --project src/CountOrSell.Cli -- sync --all
 ```
+
+### 4. Populate the images (first time only)
+
+Due to the size of the image files it is HIGHLY recommended that you use the synchronize option from the user interface to pull donw the complete set rather than querying all from the Scryfall data.  If it is desired to pull down the Scryfall images then use the following syntax:
+
+```bash
+# Sync all images for a particular set
+dotnet run --project src/CountOrSell.Cli -- images --set-code mh3
+
+# Sync all images (extremely slow)
+dotnet run --project src/CountOrSell.Cli -- images --all
+```
+
 
 ---
 
@@ -85,7 +98,14 @@ dotnet run --project src/CountOrSell.Cli -- sync --all
 
 ## Tech Stack
 
-**Backend** — .NET 8, ASP.NET Core, Entity Framework Core, SQLite, QuestPDF, BCrypt.Net
-**Frontend** — React 18, TypeScript, Vite, TanStack Query, React Router, Tailwind CSS
-**Mobile** — Capacitor (iOS / Android shells, optional)
-**Data** — Scryfall API (card/set data), MTGJSON (supplemental)
+**Backend**
+.NET 8, ASP.NET Core, Entity Framework Core, SQLite, QuestPDF, BCrypt.Net
+
+**Frontend**
+React 18, TypeScript, Vite, TanStack Query, React Router, Tailwind CSS
+
+**Mobile**
+Capacitor (iOS / Android shells, optional)
+
+**Data**
+Scryfall API (card/set data), MTGJSON (supplemental)
