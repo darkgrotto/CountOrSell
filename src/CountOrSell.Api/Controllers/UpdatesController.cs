@@ -222,7 +222,10 @@ public class UpdatesController : ControllerBase
                         existing.PriceUsdFoil = reader.IsDBNull(13) ? null : reader.GetString(13);
                         existing.ScryfallUri = reader.IsDBNull(14) ? null : reader.GetString(14);
                         existing.IsReserved = reader.GetBoolean(15);
-                        existing.LocalImagePath = reader.IsDBNull(16) ? null : reader.GetString(16);
+                        // Only overwrite LocalImagePath if the package has a value — never
+                        // wipe a locally-cached image path with null from the update package.
+                        if (!reader.IsDBNull(16))
+                            existing.LocalImagePath = reader.GetString(16);
                         existing.LastSyncedAt = DateTime.Parse(reader.GetString(17));
                     }
                     else
