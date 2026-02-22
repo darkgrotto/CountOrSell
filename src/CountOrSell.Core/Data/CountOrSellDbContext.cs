@@ -7,6 +7,7 @@ public class CountOrSellDbContext : DbContext
 {
     public CountOrSellDbContext(DbContextOptions<CountOrSellDbContext> options) : base(options) { }
 
+    public DbSet<AppSettings> AppSettings => Set<AppSettings>();
     public DbSet<User> Users => Set<User>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<BoosterDefinition> BoosterDefinitions => Set<BoosterDefinition>();
@@ -22,6 +23,11 @@ public class CountOrSellDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<AppSettings>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+        });
+
         modelBuilder.Entity<User>(entity =>
         {
             entity.HasKey(e => e.Id);
@@ -152,5 +158,14 @@ public class CountOrSellDbContext : DbContext
         // Add IsAdmin / IsDisabled columns to existing databases
         try { Database.ExecuteSqlRaw("ALTER TABLE Users ADD COLUMN IsAdmin INTEGER NOT NULL DEFAULT 0"); } catch { }
         try { Database.ExecuteSqlRaw("ALTER TABLE Users ADD COLUMN IsDisabled INTEGER NOT NULL DEFAULT 0"); } catch { }
+
+        // App-wide settings (single row, Id = 1)
+        Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "AppSettings" (
+                "Id"                   INTEGER PRIMARY KEY,
+                "RegistrationsEnabled" INTEGER NOT NULL DEFAULT 1
+            )
+            """);
+        Database.ExecuteSqlRaw("INSERT OR IGNORE INTO AppSettings (Id, RegistrationsEnabled) VALUES (1, 1)");
     }
 }

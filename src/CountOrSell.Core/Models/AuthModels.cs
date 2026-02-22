@@ -83,6 +83,12 @@ public class AdminUserInfo
     public DateTime? LastLoginAt { get; set; }
 }
 
+public class AppSettingsInfo
+{
+    [JsonPropertyName("registrationsEnabled")]
+    public bool RegistrationsEnabled { get; set; }
+}
+
 public class AdminUpdateUserRequest
 {
     [JsonPropertyName("displayName")]

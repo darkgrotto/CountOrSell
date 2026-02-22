@@ -1,5 +1,7 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
 import { Routes, Route, Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { api } from './services/api'
 import { TAGLINES } from './taglines'
 import SetList from './components/SetList'
 import SetDetail from './components/SetDetail'
@@ -17,6 +19,10 @@ import { useAuth } from './contexts/AuthContext'
 function App() {
   const { user, logout } = useAuth()
   const tagline = useMemo(() => TAGLINES[Math.floor(Math.random() * TAGLINES.length)], [])
+  const { data: regStatus } = useQuery({
+    queryKey: ['registration-status'],
+    queryFn: () => api.getRegistrationStatus(),
+  })
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -97,7 +103,7 @@ function App() {
                   to="/login"
                   className="px-3 py-1 bg-blue-600 hover:bg-blue-500 rounded text-sm"
                 >
-                  Login
+                  {regStatus?.registrationsEnabled === false ? 'Login' : 'Login / Register'}
                 </Link>
               )}
             </nav>

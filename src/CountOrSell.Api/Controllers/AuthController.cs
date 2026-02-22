@@ -25,9 +25,20 @@ public class AuthController : ControllerBase
         _db = db;
     }
 
+    [HttpGet("registration-status")]
+    public async Task<IActionResult> GetRegistrationStatus()
+    {
+        var settings = await _db.AppSettings.FindAsync(1);
+        return Ok(new AppSettingsInfo { RegistrationsEnabled = settings?.RegistrationsEnabled ?? true });
+    }
+
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
+        var settings = await _db.AppSettings.FindAsync(1);
+        if (settings?.RegistrationsEnabled == false)
+            return BadRequest(new { error = "Registrations are currently disabled" });
+
         if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
             return BadRequest(new { error = "Username and password are required" });
 

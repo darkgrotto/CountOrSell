@@ -378,6 +378,21 @@ export const api = {
     }
   },
 
+  // --- App settings (public read, admin write) ---
+  async getRegistrationStatus(): Promise<{ registrationsEnabled: boolean }> {
+    const res = await fetch(`${API_BASE}/auth/registration-status`)
+    return handleResponse(res)
+  },
+
+  async adminUpdateSettings(registrationsEnabled: boolean): Promise<{ registrationsEnabled: boolean }> {
+    const res = await fetch(`${API_BASE}/admin/settings`, {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: JSON.stringify({ registrationsEnabled }),
+    })
+    return handleResponse(res)
+  },
+
   // --- Admin (admin only) ---
   async listUsers(): Promise<AdminUserInfo[]> {
     const res = await fetch(`${API_BASE}/admin/users`, { headers: getAuthHeaders() })

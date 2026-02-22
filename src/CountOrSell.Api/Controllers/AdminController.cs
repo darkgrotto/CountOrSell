@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using CountOrSell.Core.Data;
 using CountOrSell.Core.Models;
 using CountOrSell.Core.Services;
 
@@ -12,10 +13,12 @@ namespace CountOrSell.Api.Controllers;
 public class AdminController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly CountOrSellDbContext _db;
 
-    public AdminController(IAuthService authService)
+    public AdminController(IAuthService authService, CountOrSellDbContext db)
     {
         _authService = authService;
+        _db = db;
     }
 
     private bool IsAdmin() => User.FindFirstValue("IsAdmin") == "true";
@@ -66,6 +69,20 @@ public class AdminController : ControllerBase
             CreatedAt = user.CreatedAt,
             LastLoginAt = user.LastLoginAt,
         });
+    }
+
+    [HttpPut("settings")]
+    public async Task<IActionResult> UpdateSettings([FromBody] AppSettingsInfo request)
+    {
+        if (!IsAdmin()) return Forbid();
+
+        var settings = await _db.AppSettings.FindAsync(1);
+        if (settings == null) return NotFound();
+
+        settings.RegistrationsEnabled = request.RegistrationsEnabled;
+        await _db.SaveChangesAsync();
+
+        return Ok(new AppSettingsInfo { RegistrationsEnabled = settings.RegistrationsEnabled });
     }
 
     [HttpDelete("users/{id}")]

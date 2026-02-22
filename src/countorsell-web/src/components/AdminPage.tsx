@@ -3,6 +3,46 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, AdminUserInfo } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 
+function AppSettingsPanel() {
+  const queryClient = useQueryClient()
+  const { data: regStatus, isLoading } = useQuery({
+    queryKey: ['registration-status'],
+    queryFn: () => api.getRegistrationStatus(),
+  })
+
+  const settingsMutation = useMutation({
+    mutationFn: (enabled: boolean) => api.adminUpdateSettings(enabled),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['registration-status'] }),
+  })
+
+  const enabled = regStatus?.registrationsEnabled ?? true
+
+  return (
+    <div className="bg-white rounded-lg shadow p-4 mb-6">
+      <h2 className="text-lg font-semibold mb-3">Application Settings</h2>
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium text-gray-700">Registrations</p>
+          <p className="text-xs text-gray-500">
+            {enabled ? 'New users can register accounts' : 'Registration is closed — only existing users can log in'}
+          </p>
+        </div>
+        <button
+          onClick={() => settingsMutation.mutate(!enabled)}
+          disabled={isLoading || settingsMutation.isPending}
+          className={`px-4 py-1.5 rounded text-sm font-medium transition-colors disabled:opacity-50 ${
+            enabled
+              ? 'bg-green-100 text-green-800 hover:bg-green-200'
+              : 'bg-red-100 text-red-700 hover:bg-red-200'
+          }`}
+        >
+          {enabled ? 'Enabled' : 'Disabled'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function AdminPage() {
   const { user: currentUser } = useAuth()
   const queryClient = useQueryClient()
@@ -76,7 +116,11 @@ export default function AdminPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">User Management</h1>
+      <h1 className="text-2xl font-bold mb-6">Admin</h1>
+
+      <AppSettingsPanel />
+
+      <h2 className="text-lg font-semibold mb-3">Users</h2>
 
       {error && (
         <div className="mb-4 px-4 py-3 bg-red-100 border border-red-400 text-red-700 rounded">

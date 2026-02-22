@@ -1,6 +1,8 @@
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
+import { api } from '../services/api';
 
 type TabType = 'login' | 'register';
 
@@ -14,6 +16,19 @@ export default function LoginPage() {
 
   const { login, register } = useAuth();
   const navigate = useNavigate();
+
+  const { data: regStatus } = useQuery({
+    queryKey: ['registration-status'],
+    queryFn: () => api.getRegistrationStatus(),
+  });
+  const registrationsEnabled = regStatus?.registrationsEnabled !== false;
+
+  // If registrations get disabled while on the register tab, switch to login
+  useEffect(() => {
+    if (!registrationsEnabled && activeTab === 'register') {
+      switchTab('login');
+    }
+  }, [registrationsEnabled]);
 
   const handleLoginSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -64,7 +79,7 @@ export default function LoginPage() {
           {/* Tabs */}
           <div className="flex">
             <button
-              className={`flex-1 py-4 text-center font-semibold transition-colors ${
+              className={`${registrationsEnabled ? 'flex-1' : 'w-full'} py-4 text-center font-semibold transition-colors ${
                 activeTab === 'login'
                   ? 'bg-blue-800 text-white'
                   : 'bg-gray-700 text-gray-300 hover:bg-gray-650'
@@ -73,22 +88,24 @@ export default function LoginPage() {
             >
               Login
             </button>
-            <button
-              className={`flex-1 py-4 text-center font-semibold transition-colors ${
-                activeTab === 'register'
-                  ? 'bg-blue-800 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-650'
-              }`}
-              onClick={() => switchTab('register')}
-            >
-              Register
-            </button>
+            {registrationsEnabled && (
+              <button
+                className={`flex-1 py-4 text-center font-semibold transition-colors ${
+                  activeTab === 'register'
+                    ? 'bg-blue-800 text-white'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-650'
+                }`}
+                onClick={() => switchTab('register')}
+              >
+                Register
+              </button>
+            )}
           </div>
 
           {/* Form Content */}
           <div className="p-8">
             <h2 className="text-2xl font-bold text-white mb-6">
-              {activeTab === 'login' ? 'Welcome Back' : 'Create Account'}
+              {activeTab === 'login' || !registrationsEnabled ? 'Welcome Back' : 'Create Account'}
             </h2>
 
             {error && (
@@ -97,7 +114,7 @@ export default function LoginPage() {
               </div>
             )}
 
-            {activeTab === 'login' ? (
+            {activeTab === 'login' || !registrationsEnabled ? (
               <form onSubmit={handleLoginSubmit} className="space-y-4">
                 <div>
                   <label htmlFor="login-username" className="block text-sm font-medium text-gray-300 mb-2">
