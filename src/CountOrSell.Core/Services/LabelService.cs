@@ -91,6 +91,7 @@ public class LabelService : ILabelService
                         var keyruneSymbol = KeyruneMapper.GetSymbol(set.Code);
 
                         column.Item()
+                            .Extend()
                             .PaddingVertical(5)
                             .AlignCenter()
                             .AlignMiddle()
@@ -124,8 +125,6 @@ public class LabelService : ILabelService
                                         text.Span(name).FontSize(18).Bold();
                                     });
                             });
-
-                        column.Item().Extend();
 
                         column.Item().Row(row =>
                         {
