@@ -4,6 +4,7 @@ obj/
 *.user
 *.suo
 *.db
+!src/CountOrSell.Api/database/*.db
 
 # Node
 node_modules/
