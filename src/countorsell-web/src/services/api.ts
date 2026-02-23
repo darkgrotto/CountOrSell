@@ -145,6 +145,43 @@ export interface ImportResult {
   error: string | null
 }
 
+export interface CollectionCardEntry {
+  scryfallCardId: string
+  cardName: string
+  setCode: string
+  setName: string
+  collectorNumber: string
+  variant: string
+  rarity: string
+  typeLine: string | null
+  colorIdentity: string | null
+  quantity: number
+  priceUsd: number | null
+  isReserved: boolean
+}
+
+export interface CollectionSummary {
+  totalCopies: number
+  totalUniqueCards: number
+  totalValue: number
+  byRarity: Record<string, number>
+  valueByRarity: Record<string, number>
+  byType: Record<string, number>
+  byVariant: Record<string, number>
+  reserveListOwned: number
+  reserveListValue: number
+  boostersOwned: number
+  boostersTotal: number
+}
+
+export interface CollectionFilter {
+  rarity?: string
+  type?: string
+  color?: string
+  variant?: string
+  setCode?: string
+}
+
 export interface AdminUserInfo {
   id: string
   username: string
@@ -193,6 +230,18 @@ function authHeaders(): Record<string, string> {
 // =============================================================================
 // API Client
 // =============================================================================
+
+function buildCollectionQs(filter?: CollectionFilter): string {
+  if (!filter) return ''
+  const params = new URLSearchParams()
+  if (filter.rarity && filter.rarity !== 'all') params.set('rarity', filter.rarity)
+  if (filter.type && filter.type !== 'all') params.set('type', filter.type)
+  if (filter.color && filter.color !== 'all') params.set('color', filter.color)
+  if (filter.variant && filter.variant !== 'all') params.set('variant', filter.variant)
+  if (filter.setCode && filter.setCode !== 'all') params.set('setCode', filter.setCode)
+  const s = params.toString()
+  return s ? `?${s}` : ''
+}
 
 export const api = {
   // --- Sets (anonymous) ---
@@ -443,6 +492,64 @@ export const api = {
       const body = await res.json().catch(() => ({ error: 'Unknown error' }))
       throw new Error(body.error || `HTTP error ${res.status}`)
     }
+  },
+
+  // --- Collection (authorized) ---
+
+  async getCollection(filter?: CollectionFilter): Promise<CollectionCardEntry[]> {
+    const qs = buildCollectionQs(filter)
+    const response = await fetch(`${API_BASE}/collection${qs}`, { headers: getAuthHeaders() })
+    return handleResponse<CollectionCardEntry[]>(response)
+  },
+
+  async getCollectionSummary(): Promise<CollectionSummary> {
+    const response = await fetch(`${API_BASE}/collection/summary`, { headers: getAuthHeaders() })
+    return handleResponse<CollectionSummary>(response)
+  },
+
+  async downloadCollectionSummaryCSV(): Promise<void> {
+    const response = await fetch(`${API_BASE}/export/collection/summary/csv`, { headers: getAuthHeaders() })
+    if (!response.ok) throw new Error(`HTTP error ${response.status}`)
+    const blob = await response.blob()
+    this.downloadBlob(blob, 'collection-summary.csv')
+  },
+
+  async downloadCollectionSummaryXML(): Promise<void> {
+    const response = await fetch(`${API_BASE}/export/collection/summary/xml`, { headers: getAuthHeaders() })
+    if (!response.ok) throw new Error(`HTTP error ${response.status}`)
+    const blob = await response.blob()
+    this.downloadBlob(blob, 'collection-summary.xml')
+  },
+
+  async downloadCollectionSummaryPDF(): Promise<void> {
+    const response = await fetch(`${API_BASE}/export/collection/summary/pdf`, { headers: getAuthHeaders() })
+    if (!response.ok) throw new Error(`HTTP error ${response.status}`)
+    const blob = await response.blob()
+    this.downloadBlob(blob, 'collection-summary.pdf')
+  },
+
+  async downloadCollectionDetailedCSV(filter?: CollectionFilter): Promise<void> {
+    const qs = buildCollectionQs(filter)
+    const response = await fetch(`${API_BASE}/export/collection/detailed/csv${qs}`, { headers: getAuthHeaders() })
+    if (!response.ok) throw new Error(`HTTP error ${response.status}`)
+    const blob = await response.blob()
+    this.downloadBlob(blob, 'collection-detailed.csv')
+  },
+
+  async downloadCollectionDetailedXML(filter?: CollectionFilter): Promise<void> {
+    const qs = buildCollectionQs(filter)
+    const response = await fetch(`${API_BASE}/export/collection/detailed/xml${qs}`, { headers: getAuthHeaders() })
+    if (!response.ok) throw new Error(`HTTP error ${response.status}`)
+    const blob = await response.blob()
+    this.downloadBlob(blob, 'collection-detailed.xml')
+  },
+
+  async downloadCollectionDetailedPDF(filter?: CollectionFilter): Promise<void> {
+    const qs = buildCollectionQs(filter)
+    const response = await fetch(`${API_BASE}/export/collection/detailed/pdf${qs}`, { headers: getAuthHeaders() })
+    if (!response.ok) throw new Error(`HTTP error ${response.status}`)
+    const blob = await response.blob()
+    this.downloadBlob(blob, 'collection-detailed.pdf')
   },
 
   // --- Utility ---

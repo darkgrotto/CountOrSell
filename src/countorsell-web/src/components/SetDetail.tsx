@@ -73,6 +73,15 @@ export default function SetDetail() {
     },
   })
 
+  const bulkAllMutation = useMutation({
+    mutationFn: () => api.bulkSetCardsOwned(
+      setCode!,
+      cards!.map(c => ({ scryfallCardId: c.id, cardName: c.name, collectorNumber: c.collector_number })),
+      true
+    ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['owned-cards', setCode] }),
+  })
+
   const ownedUniqueCount = new Set((cardOwnership as CardOwnershipEntry[]).map(e => e.scryfallCardId)).size
 
   // ===========================================================================
@@ -146,9 +155,21 @@ export default function SetDetail() {
 
                 {/* Ownership Stats */}
                 {user && (
-                  <span className="font-medium text-green-600">
-                    {ownedUniqueCount}/{cards.length} owned
-                  </span>
+                  <>
+                    <span className="font-medium text-green-600">
+                      {ownedUniqueCount}/{cards.length} owned
+                    </span>
+                    <button
+                      onClick={() => {
+                        if (confirm(`Mark all ${cards.length} cards in ${setCode!.toUpperCase()} as owned (Regular ×1)?`))
+                          bulkAllMutation.mutate()
+                      }}
+                      disabled={bulkAllMutation.isPending}
+                      className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 transition-colors"
+                    >
+                      {bulkAllMutation.isPending ? 'Marking…' : 'Full Set ✓'}
+                    </button>
+                  </>
                 )}
               </div>
             </div>

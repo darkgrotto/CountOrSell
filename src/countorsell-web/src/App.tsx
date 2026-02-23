@@ -12,6 +12,7 @@ import LoginPage from './components/LoginPage'
 import ProfilePage from './components/ProfilePage'
 import SettingsPage from './components/SettingsPage'
 import AdminPage from './components/AdminPage'
+import CollectionPage from './components/CollectionPage'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminRoute from './components/AdminRoute'
 import { useAuth } from './contexts/AuthContext'
@@ -50,6 +51,7 @@ function App() {
               <Link to="/" className="hover:text-blue-200">Sets</Link>
               {user && (
                 <>
+                  <Link to="/collection" className="hover:text-blue-200">Collection</Link>
                   <Link to="/reservelist" className="hover:text-blue-200">Reserve List</Link>
                   <Link to="/boosters" className="hover:text-blue-200">Boosters</Link>
                   <Link to="/slabbed" className="hover:text-blue-200">Slabs</Link>
@@ -116,6 +118,9 @@ function App() {
           <Route path="/" element={<SetList />} />
           <Route path="/sets/:setCode" element={<SetDetail />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/collection" element={
+            <ProtectedRoute><CollectionPage /></ProtectedRoute>
+          } />
           <Route path="/reservelist" element={
             <ProtectedRoute><ReserveListPage /></ProtectedRoute>
           } />

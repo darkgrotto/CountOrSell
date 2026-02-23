@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using CountOrSell.Core.Models;
 using CountOrSell.Core.Services;
 
 namespace CountOrSell.Api.Controllers;
@@ -52,5 +53,56 @@ public class ExportController : ControllerBase
     {
         var bytes = await _exportService.ExportSlabbedCardsAsPdfAsync(UserId);
         return File(bytes, "application/pdf", "slabbed-collection.pdf");
+    }
+
+    private CollectionFilter ParseCollectionFilter() => new CollectionFilter
+    {
+        Rarity  = Request.Query["rarity"].FirstOrDefault()  ?? "all",
+        Type    = Request.Query["type"].FirstOrDefault()    ?? "all",
+        Color   = Request.Query["color"].FirstOrDefault()   ?? "all",
+        Variant = Request.Query["variant"].FirstOrDefault() ?? "all",
+        SetCode = Request.Query["setCode"].FirstOrDefault() ?? "all",
+    };
+
+    [HttpGet("collection/summary/csv")]
+    public async Task<IActionResult> CollectionSummaryCsv()
+    {
+        var data = await _exportService.ExportCollectionSummaryAsCsvAsync(UserId);
+        return File(data, "text/csv", "collection-summary.csv");
+    }
+
+    [HttpGet("collection/summary/xml")]
+    public async Task<IActionResult> CollectionSummaryXml()
+    {
+        var data = await _exportService.ExportCollectionSummaryAsXmlAsync(UserId);
+        return File(data, "application/xml", "collection-summary.xml");
+    }
+
+    [HttpGet("collection/summary/pdf")]
+    public async Task<IActionResult> CollectionSummaryPdf()
+    {
+        var data = await _exportService.ExportCollectionSummaryAsPdfAsync(UserId);
+        return File(data, "application/pdf", "collection-summary.pdf");
+    }
+
+    [HttpGet("collection/detailed/csv")]
+    public async Task<IActionResult> CollectionDetailedCsv()
+    {
+        var data = await _exportService.ExportCollectionDetailedAsCsvAsync(UserId, ParseCollectionFilter());
+        return File(data, "text/csv", "collection-detailed.csv");
+    }
+
+    [HttpGet("collection/detailed/xml")]
+    public async Task<IActionResult> CollectionDetailedXml()
+    {
+        var data = await _exportService.ExportCollectionDetailedAsXmlAsync(UserId, ParseCollectionFilter());
+        return File(data, "application/xml", "collection-detailed.xml");
+    }
+
+    [HttpGet("collection/detailed/pdf")]
+    public async Task<IActionResult> CollectionDetailedPdf()
+    {
+        var data = await _exportService.ExportCollectionDetailedAsPdfAsync(UserId, ParseCollectionFilter());
+        return File(data, "application/pdf", "collection-detailed.pdf");
     }
 }

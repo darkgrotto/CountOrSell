@@ -162,9 +162,9 @@ public class CountOrSellDbContext : DbContext
         // Add Variant/Quantity columns to CardOwnership, migrate existing data, and replace unique index
         try { Database.ExecuteSqlRaw("ALTER TABLE CardOwnership ADD COLUMN Variant TEXT NOT NULL DEFAULT 'Regular'"); } catch { }
         try { Database.ExecuteSqlRaw("ALTER TABLE CardOwnership ADD COLUMN Quantity INTEGER NOT NULL DEFAULT 0"); } catch { }
-        Database.ExecuteSqlRaw("UPDATE CardOwnership SET Quantity = 1 WHERE Owned = 1 AND Quantity = 0");
-        Database.ExecuteSqlRaw("DROP INDEX IF EXISTS IX_CardOwnership_UserId_ScryfallCardId");
-        Database.ExecuteSqlRaw("CREATE UNIQUE INDEX IF NOT EXISTS IX_CardOwnership_UserId_ScryfallCardId_Variant ON CardOwnership (UserId, ScryfallCardId, Variant)");
+        try { Database.ExecuteSqlRaw("UPDATE CardOwnership SET Quantity = 1 WHERE Owned = 1 AND Quantity = 0"); } catch { }
+        try { Database.ExecuteSqlRaw("DROP INDEX IF EXISTS IX_CardOwnership_UserId_ScryfallCardId"); } catch { }
+        try { Database.ExecuteSqlRaw("CREATE UNIQUE INDEX IF NOT EXISTS IX_CardOwnership_UserId_ScryfallCardId_Variant ON CardOwnership (UserId, ScryfallCardId, Variant)"); } catch { }
 
         // App-wide settings (single row, Id = 1)
         Database.ExecuteSqlRaw("""
