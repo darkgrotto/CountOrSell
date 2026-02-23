@@ -80,7 +80,7 @@ dotnet run --project src/CountOrSell.Cli -- sync --all
 
 ### 4. Populate the images (first time only)
 
-Due to the size of the image files it is HIGHLY recommended that you use the synchronize option from the user interface to pull donw the complete set rather than querying all from the Scryfall data.  If it is desired to pull down the Scryfall images then use the following syntax:
+Due to the size of the image files it is HIGHLY recommended that you use the synchronize option from the user interface to pull down the complete set rather than querying all from the Scryfall data.  If it is desired to pull down the Scryfall images then use the following syntax:
 
 ```bash
 # Sync all images for a particular set
@@ -89,6 +89,8 @@ dotnet run --project src/CountOrSell.Cli -- images --set-code mh3
 # Sync all images (extremely slow)
 dotnet run --project src/CountOrSell.Cli -- images --all
 ```
+
+Note that the Scryfall image set is approximately 112,000 files and around 11 GB of data as of February 2026, so this will take several hours to complete.
 
 ### 5. Default Admin
 
