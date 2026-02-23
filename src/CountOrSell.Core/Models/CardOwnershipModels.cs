@@ -70,3 +70,21 @@ public class CardVariantQuantityRequest
     [JsonPropertyName("collectorNumber")]
     public string CollectorNumber { get; set; } = string.Empty;
 }
+
+public class ImportResult
+{
+    [JsonPropertyName("imported")]
+    public int Imported { get; set; }
+
+    [JsonPropertyName("unmatched")]
+    public int Unmatched { get; set; }
+
+    [JsonPropertyName("unmatchedCards")]
+    public List<string> UnmatchedCards { get; set; } = new();
+
+    [JsonPropertyName("detectedFormat")]
+    public string? DetectedFormat { get; set; }
+
+    [JsonPropertyName("error")]
+    public string? Error { get; set; }
+}

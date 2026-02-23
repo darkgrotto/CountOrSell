@@ -29,16 +29,17 @@ public class ExportService : IExportService
     public async Task<byte[]> ExportOwnedCardsAsCsvAsync(string userId)
     {
         var cards = await _db.CardOwnerships
-            .Where(c => c.UserId == userId && c.Owned)
+            .Where(c => c.UserId == userId && c.Quantity > 0)
             .OrderBy(c => c.SetCode)
             .ThenBy(c => c.CardName)
+            .ThenBy(c => c.Variant)
             .ToListAsync();
 
         var sb = new StringBuilder();
-        sb.AppendLine("CardName,SetCode,CollectorNumber,ScryfallCardId");
+        sb.AppendLine("CardName,SetCode,CollectorNumber,ScryfallCardId,Variant,Quantity");
         foreach (var card in cards)
         {
-            sb.AppendLine($"\"{EscapeCsv(card.CardName)}\",{card.SetCode},{card.CollectorNumber},{card.ScryfallCardId}");
+            sb.AppendLine($"\"{EscapeCsv(card.CardName)}\",{card.SetCode},{card.CollectorNumber},{card.ScryfallCardId},\"{EscapeCsv(card.Variant)}\",{card.Quantity}");
         }
 
         return Encoding.UTF8.GetBytes(sb.ToString());
@@ -47,9 +48,10 @@ public class ExportService : IExportService
     public async Task<byte[]> ExportOwnedCardsAsXmlAsync(string userId)
     {
         var cards = await _db.CardOwnerships
-            .Where(c => c.UserId == userId && c.Owned)
+            .Where(c => c.UserId == userId && c.Quantity > 0)
             .OrderBy(c => c.SetCode)
             .ThenBy(c => c.CardName)
+            .ThenBy(c => c.Variant)
             .ToListAsync();
 
         var doc = new XDocument(
@@ -58,7 +60,9 @@ public class ExportService : IExportService
                     new XElement("Name", c.CardName),
                     new XElement("SetCode", c.SetCode),
                     new XElement("CollectorNumber", c.CollectorNumber),
-                    new XElement("ScryfallId", c.ScryfallCardId)
+                    new XElement("ScryfallId", c.ScryfallCardId),
+                    new XElement("Variant", c.Variant),
+                    new XElement("Quantity", c.Quantity)
                 ))
             )
         );

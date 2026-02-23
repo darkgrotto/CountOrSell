@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import UpdateCheckPanel from './UpdateCheckPanel'
 import ExportPanel from './ExportPanel'
+import ImportPanel from './ImportPanel'
 import { api } from '../services/api'
 
 export default function SettingsPage() {
@@ -28,6 +29,12 @@ export default function SettingsPage() {
         <section>
           <h2 className="text-xl font-semibold mb-3">Database Updates</h2>
           <UpdateCheckPanel />
+        </section>
+
+        {/* Import */}
+        <section>
+          <h2 className="text-xl font-semibold mb-3">Import Data</h2>
+          <ImportPanel />
         </section>
 
         {/* Exports */}

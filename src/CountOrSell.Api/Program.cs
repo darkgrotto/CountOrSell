@@ -71,6 +71,7 @@ builder.Services.AddScoped<ICollectionService, CollectionService>();
 builder.Services.AddScoped<ICardDataService>(sp =>
     new CardDataService(sp.GetRequiredService<CountOrSellDbContext>(), imagesRoot));
 builder.Services.AddScoped<IExportService, ExportService>();
+builder.Services.AddScoped<IImportService, ImportService>();
 builder.Services.AddScoped<ISlabbedCardService, SlabbedCardService>();
 builder.Services.AddSingleton<ILabelService, LabelService>();
 

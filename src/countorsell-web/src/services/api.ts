@@ -137,6 +137,14 @@ export interface CardOwnershipEntry {
   quantity: number
 }
 
+export interface ImportResult {
+  imported: number
+  unmatched: number
+  unmatchedCards: string[]
+  detectedFormat: string | null
+  error: string | null
+}
+
 export interface AdminUserInfo {
   id: string
   username: string
@@ -360,6 +368,18 @@ export const api = {
     }
     const blob = await response.blob()
     this.downloadBlob(blob, 'slabbed-collection.pdf')
+  },
+
+  // --- Import (authorized) ---
+  async importCollection(file: File): Promise<ImportResult> {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await fetch(`${API_BASE}/import/collection`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: formData,
+    })
+    return handleResponse<ImportResult>(res)
   },
 
   // --- Auth Profile (authorized) ---
