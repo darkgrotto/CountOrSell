@@ -164,17 +164,27 @@ export default function CardDetailModal({ card, onClose, cardOwnership = [], onS
             </div>
           )}
 
-          {/* Scryfall Link */}
-          {card.scryfall_uri && (
+          {/* External Links */}
+          <div className="flex items-center gap-4">
+            {card.scryfall_uri && (
+              <a
+                href={card.scryfall_uri}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-blue-600 hover:underline"
+              >
+                View on Scryfall
+              </a>
+            )}
             <a
-              href={card.scryfall_uri}
+              href={`https://scryfall.com/card/${card.set}/${card.collector_number}/rulings`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-block text-sm text-blue-600 hover:underline"
+              className="text-sm text-blue-600 hover:underline"
             >
-              View on Scryfall
+              Oracle Rulings
             </a>
-          )}
+          </div>
 
           {/* Collection */}
           {onSaveVariant && (
