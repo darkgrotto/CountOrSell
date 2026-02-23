@@ -14,7 +14,7 @@
 // =============================================================================
 
 import { useState, useMemo } from 'react'
-import { MtgCard } from '../services/api'
+import { MtgCard, CardOwnershipEntry } from '../services/api'
 import ReserveListBadge from './ReserveListBadge'
 import CardDetailModal from './CardDetailModal'
 
@@ -30,9 +30,8 @@ type SortField = 'number' | 'name' | 'rarity' | 'price' | 'owned' | 'needed'
  */
 interface CardGridProps {
   cards: MtgCard[]
-  reservedCardIds?: string[]
-  ownedCardIds?: string[]
-  onToggleOwned?: (card: MtgCard) => void
+  cardOwnership?: CardOwnershipEntry[]
+  onSaveVariant?: (card: MtgCard, variant: string, quantity: number) => void
 }
 
 // =============================================================================
@@ -53,9 +52,18 @@ interface CardGridProps {
  * @param cards - Array of MtgCard objects to display
  * @returns The card grid UI with search/filter controls
  */
-export default function CardGrid({ cards, reservedCardIds = [], ownedCardIds = [], onToggleOwned }: CardGridProps) {
-  const reservedSet = new Set(reservedCardIds)
-  const ownedSet = new Set(ownedCardIds)
+export default function CardGrid({ cards, cardOwnership = [], onSaveVariant }: CardGridProps) {
+  const cardQtyMap = useMemo(() => {
+    const map: Record<string, { variant: string; quantity: number }[]> = {}
+    for (const e of cardOwnership) {
+      if (!map[e.scryfallCardId]) map[e.scryfallCardId] = []
+      map[e.scryfallCardId].push({ variant: e.variant, quantity: e.quantity })
+    }
+    return map
+  }, [cardOwnership])
+
+  const ownedSet = useMemo(() => new Set(Object.keys(cardQtyMap)), [cardQtyMap])
+  const hasRlCards = cards.some(c => c.reserved)
   // ===========================================================================
   // State Management
   // ===========================================================================
@@ -89,7 +97,7 @@ export default function CardGrid({ cards, reservedCardIds = [], ownedCardIds = [
 
       const matchesRarity =
         filterRarity === 'all' ? true :
-        filterRarity === 'reserved' ? reservedSet.has(card.id) :
+        filterRarity === 'reserved' ? !!card.reserved :
         filterRarity === 'owned' ? ownedSet.has(card.id) :
         filterRarity === 'unowned' ? !ownedSet.has(card.id) :
         card.rarity === filterRarity
@@ -131,15 +139,15 @@ export default function CardGrid({ cards, reservedCardIds = [], ownedCardIds = [
           return ao - bo || a.name.localeCompare(b.name)
         }
         case 'needed': {
-          const an = ownedSet.has(a.id) ? 1 : 0
-          const bn = ownedSet.has(b.id) ? 1 : 0
+          const an = !ownedSet.has(a.id) ? 0 : 1
+          const bn = !ownedSet.has(b.id) ? 0 : 1
           return an - bn || a.name.localeCompare(b.name)
         }
         default: // 'number'
           return a.collector_number.localeCompare(b.collector_number, undefined, { numeric: true })
       }
     })
-  }, [cards, searchTerm, filterRarity, filterType, filterColor, sortBy, reservedSet, ownedSet])
+  }, [cards, searchTerm, filterRarity, filterType, filterColor, sortBy, ownedSet])
 
   /**
    * Extract unique rarities from the cards for the filter dropdown.
@@ -231,10 +239,10 @@ export default function CardGrid({ cards, reservedCardIds = [], ownedCardIds = [
               {rarity.charAt(0).toUpperCase() + rarity.slice(1)}
             </option>
           ))}
-          {reservedCardIds.length > 0 && (
+          {hasRlCards && (
             <option value="reserved">Reserve List</option>
           )}
-          {onToggleOwned && (
+          {onSaveVariant && (
             <>
               <option value="owned">Owned</option>
               <option value="unowned">Unowned</option>
@@ -286,7 +294,7 @@ export default function CardGrid({ cards, reservedCardIds = [], ownedCardIds = [
           <option value="name">Sort by Name</option>
           <option value="rarity">Sort by Rarity</option>
           <option value="price">Sort by Price</option>
-          {onToggleOwned && (
+          {onSaveVariant && (
             <>
               <option value="owned">Owned First</option>
               <option value="needed">Needed First</option>
@@ -352,21 +360,25 @@ export default function CardGrid({ cards, reservedCardIds = [], ownedCardIds = [
                 {card.rarity.charAt(0).toUpperCase()}
               </div>
 
-              {reservedSet.has(card.id) && <ReserveListBadge />}
+              {card.reserved && <ReserveListBadge />}
 
-              {onToggleOwned && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onToggleOwned(card); }}
-                  className={`absolute bottom-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
-                    ownedSet.has(card.id)
-                      ? 'bg-green-500 text-white shadow-md'
-                      : 'bg-black/40 text-white/60 hover:bg-black/60'
-                  }`}
-                  title={ownedSet.has(card.id) ? 'Mark as unowned' : 'Mark as owned'}
-                >
-                  {ownedSet.has(card.id) ? '\u2713' : '\u2713'}
-                </button>
-              )}
+              {onSaveVariant && (() => {
+                const entries = cardQtyMap[card.id] ?? []
+                const totalQty = entries.reduce((s, e) => s + e.quantity, 0)
+                return (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setSelectedCard(card) }}
+                    className={`absolute bottom-2 right-2 min-w-[1.75rem] h-7 px-1 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                      totalQty > 0
+                        ? 'bg-green-500 text-white shadow-md'
+                        : 'bg-black/40 text-white/60 hover:bg-black/60'
+                    }`}
+                    title={totalQty > 0 ? `${totalQty} in collection — click to edit` : 'Add to collection'}
+                  >
+                    {totalQty > 0 ? (totalQty > 99 ? '99+' : String(totalQty)) : '\u2713'}
+                  </button>
+                )
+              })()}
             </div>
 
             {/* Card Info (below image) */}
@@ -400,10 +412,13 @@ export default function CardGrid({ cards, reservedCardIds = [], ownedCardIds = [
       )}
 
       <CardDetailModal
+        key={selectedCard?.id ?? 'none'}
         card={selectedCard}
         onClose={() => setSelectedCard(null)}
-        isOwned={selectedCard ? ownedSet.has(selectedCard.id) : false}
-        onToggleOwned={onToggleOwned && selectedCard ? () => onToggleOwned(selectedCard) : undefined}
+        cardOwnership={selectedCard ? (cardQtyMap[selectedCard.id] ?? []) : []}
+        onSaveVariant={onSaveVariant && selectedCard
+          ? (variant, qty) => onSaveVariant(selectedCard, variant, qty)
+          : undefined}
       />
     </div>
   )

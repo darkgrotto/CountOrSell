@@ -131,6 +131,12 @@ export interface CardSearchResult {
   collectorNumber: string
 }
 
+export interface CardOwnershipEntry {
+  scryfallCardId: string
+  variant: string
+  quantity: number
+}
+
 export interface AdminUserInfo {
   id: string
   username: string
@@ -275,16 +281,16 @@ export const api = {
   },
 
   // --- Card Ownership (authorized) ---
-  async getOwnedCardsForSet(setCode: string): Promise<string[]> {
+  async getOwnedCardsForSet(setCode: string): Promise<CardOwnershipEntry[]> {
     const response = await fetch(`${API_BASE}/sets/${setCode}/owned-cards`, { headers: getAuthHeaders() })
-    return handleResponse<string[]>(response)
+    return handleResponse<CardOwnershipEntry[]>(response)
   },
 
-  async setCardOwned(scryfallCardId: string, owned: boolean, cardName: string, setCode: string, collectorNumber: string): Promise<void> {
-    const response = await fetch(`${API_BASE}/cards/${scryfallCardId}/owned`, {
-      method: 'PATCH',
+  async setCardVariantQuantity(scryfallCardId: string, variant: string, quantity: number, cardName: string, setCode: string, collectorNumber: string): Promise<void> {
+    const response = await fetch(`${API_BASE}/cards/${scryfallCardId}/variant`, {
+      method: 'PUT',
       headers: authHeaders(),
-      body: JSON.stringify({ owned, cardName, setCode, collectorNumber }),
+      body: JSON.stringify({ variant, quantity, cardName, setCode, collectorNumber }),
     })
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Unknown error' }))

@@ -16,7 +16,7 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { api, MtgSet, MtgCard, CardSearchResult } from '../services/api'
+import { api, MtgSet, MtgCard, CardSearchResult, CardOwnershipEntry } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import CardDetailModal from './CardDetailModal'
 
@@ -82,18 +82,22 @@ export default function SetList() {
     enabled: !!selectedResult,
   })
 
-  // Fetch owned card IDs for the selected result's set
+  // Fetch owned card quantities for the selected result's set
   const { data: selectedSetOwned = [] } = useQuery({
     queryKey: ['owned-cards', selectedResult?.setCode],
     queryFn: () => api.getOwnedCardsForSet(selectedResult!.setCode),
     enabled: !!selectedResult && !!user,
   })
 
-  const toggleSelectedOwned = useMutation({
-    mutationFn: (card: MtgCard) => {
-      const isOwned = selectedSetOwned.includes(card.id)
-      return api.setCardOwned(card.id, !isOwned, card.name, card.set, card.collector_number)
-    },
+  const selectedSetOwnedMap: Record<string, { variant: string; quantity: number }[]> = {}
+  for (const e of selectedSetOwned as CardOwnershipEntry[]) {
+    if (!selectedSetOwnedMap[e.scryfallCardId]) selectedSetOwnedMap[e.scryfallCardId] = []
+    selectedSetOwnedMap[e.scryfallCardId].push({ variant: e.variant, quantity: e.quantity })
+  }
+
+  const saveVariantForResult = useMutation({
+    mutationFn: ({ card, variant, quantity }: { card: MtgCard; variant: string; quantity: number }) =>
+      api.setCardVariantQuantity(card.id, variant, quantity, card.name, card.set, card.collector_number),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['owned-cards', selectedResult?.setCode] })
     },
@@ -436,10 +440,13 @@ export default function SetList() {
 
       {/* Card detail modal for search results */}
       <CardDetailModal
+        key={selectedFullCard?.id ?? 'none'}
         card={selectedFullCard}
         onClose={() => setSelectedResult(null)}
-        isOwned={selectedResult ? selectedSetOwned.includes(selectedResult.id) : false}
-        onToggleOwned={user && selectedFullCard ? () => toggleSelectedOwned.mutate(selectedFullCard) : undefined}
+        cardOwnership={selectedFullCard ? (selectedSetOwnedMap[selectedFullCard.id] ?? []) : []}
+        onSaveVariant={user && selectedFullCard
+          ? (variant, qty) => saveVariantForResult.mutate({ card: selectedFullCard, variant, quantity: qty })
+          : undefined}
       />
     </div>
   )

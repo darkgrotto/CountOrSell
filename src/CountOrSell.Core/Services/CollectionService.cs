@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using CountOrSell.Core.Data;
 using CountOrSell.Core.Entities;
+using CountOrSell.Core.Models;
 
 namespace CountOrSell.Core.Services;
 
@@ -20,8 +21,8 @@ public interface ICollectionService
     Task<List<string>> GetReserveListCardIdsForSetAsync(string userId, string setCode);
 
     // Card Ownership
-    Task<List<string>> GetOwnedCardIdsForSetAsync(string userId, string setCode);
-    Task<CardOwnership> SetCardOwnedAsync(string userId, string scryfallCardId, string cardName, string setCode, string collectorNumber, bool owned);
+    Task<List<CardOwnershipEntry>> GetCardQuantitiesForSetAsync(string userId, string setCode);
+    Task<CardOwnership> SetCardVariantQuantityAsync(string userId, string scryfallCardId, string variant, int quantity, string cardName, string setCode, string collectorNumber);
     Task BulkSetCardsOwnedAsync(string userId, List<(string scryfallCardId, string cardName, string setCode, string collectorNumber)> cards, bool owned);
 }
 
@@ -154,22 +155,23 @@ public class CollectionService : ICollectionService
 
     // ---- Card Ownership ----
 
-    public async Task<List<string>> GetOwnedCardIdsForSetAsync(string userId, string setCode)
+    public async Task<List<CardOwnershipEntry>> GetCardQuantitiesForSetAsync(string userId, string setCode)
     {
         return await _db.CardOwnerships
-            .Where(c => c.UserId == userId && c.SetCode == setCode.ToLowerInvariant() && c.Owned)
-            .Select(c => c.ScryfallCardId)
+            .Where(c => c.UserId == userId && c.SetCode == setCode.ToLowerInvariant() && c.Quantity > 0)
+            .Select(c => new CardOwnershipEntry { ScryfallCardId = c.ScryfallCardId, Variant = c.Variant, Quantity = c.Quantity })
             .ToListAsync();
     }
 
-    public async Task<CardOwnership> SetCardOwnedAsync(string userId, string scryfallCardId, string cardName, string setCode, string collectorNumber, bool owned)
+    public async Task<CardOwnership> SetCardVariantQuantityAsync(string userId, string scryfallCardId, string variant, int quantity, string cardName, string setCode, string collectorNumber)
     {
         var existing = await _db.CardOwnerships
-            .FirstOrDefaultAsync(c => c.UserId == userId && c.ScryfallCardId == scryfallCardId);
+            .FirstOrDefaultAsync(c => c.UserId == userId && c.ScryfallCardId == scryfallCardId && c.Variant == variant);
 
         if (existing != null)
         {
-            existing.Owned = owned;
+            existing.Quantity = quantity;
+            existing.Owned = quantity > 0;
             await _db.SaveChangesAsync();
             return existing;
         }
@@ -181,7 +183,9 @@ public class CollectionService : ICollectionService
             CardName = cardName,
             SetCode = setCode.ToLowerInvariant(),
             CollectorNumber = collectorNumber,
-            Owned = owned
+            Variant = variant,
+            Quantity = quantity,
+            Owned = quantity > 0
         };
 
         _db.CardOwnerships.Add(ownership);
@@ -193,7 +197,7 @@ public class CollectionService : ICollectionService
     {
         var cardIds = cards.Select(c => c.scryfallCardId).ToList();
         var existing = await _db.CardOwnerships
-            .Where(c => c.UserId == userId && cardIds.Contains(c.ScryfallCardId))
+            .Where(c => c.UserId == userId && cardIds.Contains(c.ScryfallCardId) && c.Variant == "Regular")
             .ToListAsync();
 
         var existingMap = existing.ToDictionary(c => c.ScryfallCardId);
@@ -202,9 +206,10 @@ public class CollectionService : ICollectionService
         {
             if (existingMap.TryGetValue(card.scryfallCardId, out var record))
             {
+                record.Quantity = owned ? 1 : 0;
                 record.Owned = owned;
             }
-            else
+            else if (owned)
             {
                 _db.CardOwnerships.Add(new CardOwnership
                 {
@@ -213,7 +218,9 @@ public class CollectionService : ICollectionService
                     CardName = card.cardName,
                     SetCode = card.setCode.ToLowerInvariant(),
                     CollectorNumber = card.collectorNumber,
-                    Owned = owned
+                    Variant = "Regular",
+                    Quantity = 1,
+                    Owned = true
                 });
             }
         }

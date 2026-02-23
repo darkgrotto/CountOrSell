@@ -1,11 +1,11 @@
-import { useEffect } from 'react'
-import { MtgCard } from '../services/api'
+import { useEffect, useState } from 'react'
+import { MtgCard, CARD_VARIANTS } from '../services/api'
 
 interface CardDetailModalProps {
   card: MtgCard | null
   onClose: () => void
-  isOwned?: boolean
-  onToggleOwned?: () => void
+  cardOwnership?: { variant: string; quantity: number }[]
+  onSaveVariant?: (variant: string, quantity: number) => void
 }
 
 const COLOR_STYLES: Record<string, string> = {
@@ -34,7 +34,14 @@ const getRarityBadge = (rarity: string): string => {
   }
 }
 
-export default function CardDetailModal({ card, onClose, isOwned, onToggleOwned }: CardDetailModalProps) {
+export default function CardDetailModal({ card, onClose, cardOwnership = [], onSaveVariant }: CardDetailModalProps) {
+  // Local quantity state, initialized from cardOwnership prop (reset when card changes via key prop)
+  const [quantities, setQuantities] = useState<Record<string, number>>(() =>
+    Object.fromEntries(cardOwnership.map(e => [e.variant, e.quantity]))
+  )
+
+  const totalOwned = Object.values(quantities).reduce((s, v) => s + v, 0)
+
   useEffect(() => {
     if (!card) return
     const handleKey = (e: KeyboardEvent) => {
@@ -169,18 +176,43 @@ export default function CardDetailModal({ card, onClose, isOwned, onToggleOwned 
             </a>
           )}
 
-          {/* Add to Collection */}
-          {onToggleOwned && (
-            <button
-              onClick={onToggleOwned}
-              className={`mt-4 w-full py-2 rounded-lg text-sm font-medium transition-colors ${
-                isOwned
-                  ? 'bg-green-100 hover:bg-green-200 text-green-800'
-                  : 'bg-blue-600 hover:bg-blue-700 text-white'
-              }`}
-            >
-              {isOwned ? '✓ In Collection' : '+ Add to Collection'}
-            </button>
+          {/* Collection */}
+          {onSaveVariant && (
+            <div className="border-t border-gray-200 pt-4">
+              <p className="text-sm font-medium text-gray-700 mb-2">
+                Collection{totalOwned > 0 ? ` — ${totalOwned} total` : ''}
+              </p>
+              <div className="space-y-1.5">
+                {CARD_VARIANTS.map(variant => {
+                  const qty = quantities[variant] ?? 0
+                  return (
+                    <div key={variant} className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">{variant}</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            const newQty = Math.max(0, qty - 1)
+                            setQuantities(prev => ({ ...prev, [variant]: newQty }))
+                            onSaveVariant(variant, newQty)
+                          }}
+                          disabled={qty === 0}
+                          className="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-sm disabled:opacity-30 disabled:cursor-not-allowed"
+                        >−</button>
+                        <span className="w-8 text-center text-sm font-medium tabular-nums">{qty}</span>
+                        <button
+                          onClick={() => {
+                            const newQty = qty + 1
+                            setQuantities(prev => ({ ...prev, [variant]: newQty }))
+                            onSaveVariant(variant, newQty)
+                          }}
+                          className="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-sm"
+                        >+</button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
           )}
 
           {/* Close Button */}

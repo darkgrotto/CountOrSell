@@ -20,18 +20,19 @@ public class CardOwnershipController : ControllerBase
     private string UserId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
 
     [HttpGet("api/sets/{setCode}/owned-cards")]
-    public async Task<IActionResult> GetOwnedCardIds(string setCode)
+    public async Task<IActionResult> GetCardQuantities(string setCode)
     {
-        var ids = await _collectionService.GetOwnedCardIdsForSetAsync(UserId, setCode);
-        return Ok(ids);
+        var entries = await _collectionService.GetCardQuantitiesForSetAsync(UserId, setCode);
+        return Ok(entries);
     }
 
-    [HttpPatch("api/cards/{scryfallCardId}/owned")]
-    public async Task<IActionResult> SetCardOwned(string scryfallCardId, [FromBody] CardOwnedRequest request)
+    [HttpPut("api/cards/{scryfallCardId}/variant")]
+    public async Task<IActionResult> SetCardVariantQuantity(string scryfallCardId, [FromBody] CardVariantQuantityRequest request)
     {
-        var ownership = await _collectionService.SetCardOwnedAsync(
-            UserId, scryfallCardId, request.CardName, request.SetCode, request.CollectorNumber, request.Owned);
-        return Ok(new { ownership.ScryfallCardId, ownership.Owned });
+        var ownership = await _collectionService.SetCardVariantQuantityAsync(
+            UserId, scryfallCardId, request.Variant, request.Quantity,
+            request.CardName, request.SetCode, request.CollectorNumber);
+        return Ok(new { ownership.ScryfallCardId, ownership.Variant, ownership.Quantity });
     }
 
     [HttpPost("api/cards/bulk-owned")]

@@ -40,3 +40,33 @@ public class BulkCardEntry
     [JsonPropertyName("collectorNumber")]
     public string CollectorNumber { get; set; } = string.Empty;
 }
+
+public class CardOwnershipEntry
+{
+    [JsonPropertyName("scryfallCardId")]
+    public string ScryfallCardId { get; set; } = string.Empty;
+
+    [JsonPropertyName("variant")]
+    public string Variant { get; set; } = string.Empty;
+
+    [JsonPropertyName("quantity")]
+    public int Quantity { get; set; }
+}
+
+public class CardVariantQuantityRequest
+{
+    [JsonPropertyName("variant")]
+    public string Variant { get; set; } = "Regular";
+
+    [JsonPropertyName("quantity")]
+    public int Quantity { get; set; }
+
+    [JsonPropertyName("cardName")]
+    public string CardName { get; set; } = string.Empty;
+
+    [JsonPropertyName("setCode")]
+    public string SetCode { get; set; } = string.Empty;
+
+    [JsonPropertyName("collectorNumber")]
+    public string CollectorNumber { get; set; } = string.Empty;
+}

@@ -12,7 +12,7 @@
 
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api, MtgCard } from '../services/api'
+import { api, MtgCard, CardOwnershipEntry } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import CardGrid from './CardGrid'
 import LabelPreview from './LabelPreview'
@@ -57,13 +57,7 @@ export default function SetDetail() {
     enabled: !!setCode,
   })
 
-  const { data: reserveListIds = [] } = useQuery({
-    queryKey: ['reservelist-ids', setCode],
-    queryFn: () => api.getReserveListIdsForSet(setCode!),
-    enabled: !!setCode && !!user,
-  })
-
-  const { data: ownedCardIds = [] } = useQuery({
+  const { data: cardOwnership = [] } = useQuery({
     queryKey: ['owned-cards', setCode],
     queryFn: () => api.getOwnedCardsForSet(setCode!),
     enabled: !!setCode && !!user,
@@ -71,15 +65,15 @@ export default function SetDetail() {
 
   const queryClient = useQueryClient()
 
-  const toggleOwnedMutation = useMutation({
-    mutationFn: (card: MtgCard) => {
-      const isOwned = ownedCardIds.includes(card.id)
-      return api.setCardOwned(card.id, !isOwned, card.name, card.set, card.collector_number)
-    },
+  const saveVariantMutation = useMutation({
+    mutationFn: ({ card, variant, quantity }: { card: MtgCard; variant: string; quantity: number }) =>
+      api.setCardVariantQuantity(card.id, variant, quantity, card.name, card.set, card.collector_number),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['owned-cards', setCode] })
     },
   })
+
+  const ownedUniqueCount = new Set((cardOwnership as CardOwnershipEntry[]).map(e => e.scryfallCardId)).size
 
   // ===========================================================================
   // Loading State
@@ -151,9 +145,11 @@ export default function SetDetail() {
                 </span>
 
                 {/* Ownership Stats */}
-                <span className="font-medium text-green-600">
-                  {ownedCardIds.length}/{cards.length} owned
-                </span>
+                {user && (
+                  <span className="font-medium text-green-600">
+                    {ownedUniqueCount}/{cards.length} owned
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -173,9 +169,8 @@ export default function SetDetail() {
           ===================================================================== */}
       <CardGrid
         cards={cards}
-        reservedCardIds={reserveListIds}
-        ownedCardIds={ownedCardIds}
-        onToggleOwned={user ? (card) => toggleOwnedMutation.mutate(card) : undefined}
+        cardOwnership={cardOwnership}
+        onSaveVariant={user ? (card, variant, quantity) => saveVariantMutation.mutate({ card, variant, quantity }) : undefined}
       />
     </div>
   )
