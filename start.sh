@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 # CountOrSell startup script
-# Starts the ASP.NET Core API (port 5000) and the Vite dev server (port 5173)
+# Starts the ASP.NET Core API and the Vite dev server.
+#
+# Usage:  ./start.sh [--api-port PORT] [--web-port PORT]
+#
+#   --api-port PORT   Port for the ASP.NET Core API  (default: 5000)
+#   --web-port PORT   Port for the Vite dev server   (default: 5173)
+#
+# Examples:
+#   ./start.sh
+#   ./start.sh --api-port 7000 --web-port 3000
 
 set -e
 
@@ -9,8 +18,19 @@ API_DIR="$SCRIPT_DIR/src/CountOrSell.Api"
 WEB_DIR="$SCRIPT_DIR/src/CountOrSell-web"
 
 API_PORT=5000
+WEB_PORT=5173
 API_PID=""
 WEB_PID=""
+
+# ── Argument parsing ─────────────────────────────────────────────────────────
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --api-port) API_PORT="$2"; shift 2 ;;
+    --web-port) WEB_PORT="$2"; shift 2 ;;
+    *) echo "[WARN] Unknown argument: $1"; shift ;;
+  esac
+done
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -18,8 +38,10 @@ log()  { echo "[$(date '+%H:%M:%S')] $*"; }
 err()  { echo "[$(date '+%H:%M:%S')] ERROR: $*" >&2; }
 
 check_tool() {
-  if ! command -v "$1" &>/dev/null; then
-    err "'$1' not found. Please install it and try again."
+  local cmd="$1" url="$2"
+  if ! command -v "$cmd" &>/dev/null; then
+    err "'$cmd' not found."
+    [[ -n "$url" ]] && echo "       Download: $url" >&2
     exit 1
   fi
 }
@@ -52,8 +74,8 @@ trap cleanup SIGINT SIGTERM
 
 # ── Preflight checks ─────────────────────────────────────────────────────────
 
-check_tool dotnet
-check_tool npm
+check_tool dotnet "https://dotnet.microsoft.com/download"
+check_tool npm    "https://nodejs.org/"
 
 log "CountOrSell — starting services"
 echo "────────────────────────────────────────"
@@ -103,7 +125,7 @@ log "Installing frontend dependencies..."
 (cd "$WEB_DIR" && npm install --silent)
 
 log "Starting frontend dev server..."
-(cd "$WEB_DIR" && npm run dev) \
+(cd "$WEB_DIR" && npm run dev -- --port $WEB_PORT) \
   2>&1 | sed 's/^/[WEB] /' &
 WEB_PID=$!
 
@@ -113,7 +135,7 @@ echo ""
 echo "════════════════════════════════════════"
 echo "  API           http://localhost:$API_PORT"
 echo "  API (Swagger)  http://localhost:$API_PORT/swagger"
-echo "  Frontend      http://localhost:5173"
+echo "  Frontend      http://localhost:$WEB_PORT"
 echo "════════════════════════════════════════"
 echo "  Press Ctrl+C to stop all services."
 echo ""

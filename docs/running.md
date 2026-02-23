@@ -4,10 +4,18 @@
 
 The easiest way to run both services together is the included startup script.
 
+Both scripts accept optional flags to override the default ports:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--api-port PORT` | `5000` | Port for the ASP.NET Core API |
+| `--web-port PORT` | `5173` | Port for the Vite dev server |
+
 ### Linux / macOS / Git Bash
 
 ```bash
-./start.sh
+./start.sh                                    # defaults (5000 / 5173)
+./start.sh --api-port 7000 --web-port 3000    # custom ports
 ```
 
 ```
@@ -32,7 +40,8 @@ Press **Ctrl+C** to stop both services cleanly.
 ### Windows (native cmd)
 
 ```
-start.bat
+start.bat                                        :: defaults (5000 / 5173)
+start.bat --api-port 7000 --web-port 3000        :: custom ports
 ```
 
 On Windows, `start.bat` opens the API and frontend each in their own console window. Close those windows to stop the services. The original window can be closed once both services are running.
@@ -92,23 +101,21 @@ dotnet run --project src/CountOrSell.Cli -- <command> [options]
 
 | Service | Default port | Configurable |
 |---------|-------------|--------------|
-| API | 5000 | `--urls` flag on `dotnet run`, or `ASPNETCORE_URLS` env var |
-| Frontend dev server | 5173 | `vite.config.ts` → `server.port` |
+| API | 5000 | `--api-port` flag on startup scripts, or `--urls` / `ASPNETCORE_URLS` when running manually |
+| Frontend dev server | 5173 | `--web-port` flag on startup scripts, or `--port` passed to Vite when running manually |
 | Swagger UI | 5000 | Same as API, at `/swagger` |
 
-If port 5000 is already in use, the startup scripts will attempt to kill the conflicting process. If you need to use a different port, change `API_PORT` at the top of `start.sh` / `start.bat` and update `vite.config.ts`:
+If port 5000 is already in use, the startup scripts will attempt to kill the conflicting process. To use a different port, pass the flags directly:
 
-```ts
-// src/countorsell-web/vite.config.ts
-server: {
-  proxy: {
-    '/api': {
-      target: 'http://localhost:5001',  // ← new port
-      changeOrigin: true
-    }
-  }
-}
+```bash
+# Linux / macOS / Git Bash
+./start.sh --api-port 7000 --web-port 3000
+
+# Windows
+start.bat --api-port 7000 --web-port 3000
 ```
+
+> **Note:** When changing the API port, the Vite proxy must also know the new address. The `--api-port` flag updates the API process only; if you run the frontend separately you will need to update `vite.config.ts` → `server.proxy['/api'].target` to match. When using the startup scripts the proxy target is not automatically updated — this is only relevant if you run the two services independently.
 
 ---
 
