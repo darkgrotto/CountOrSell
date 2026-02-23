@@ -1,7 +1,16 @@
 @echo off
 :: CountOrSell startup script (Windows native)
-:: Starts the ASP.NET Core API (port 5000) and the Vite dev server (port 5173)
+:: Starts the ASP.NET Core API and the Vite dev server.
 :: Each service opens in its own console window.
+::
+:: Usage:  start.bat [--api-port PORT] [--web-port PORT]
+::
+::   --api-port PORT   Port for the ASP.NET Core API  (default: 5000)
+::   --web-port PORT   Port for the Vite dev server   (default: 5173)
+::
+:: Examples:
+::   start.bat
+::   start.bat --api-port 7000 --web-port 3000
 
 setlocal enabledelayedexpansion
 
@@ -15,18 +24,40 @@ set "API_DIR=%SCRIPT_DIR%\src\CountOrSell.Api"
 set "WEB_DIR=%SCRIPT_DIR%\src\CountOrSell-web"
 set "SLN_FILE=%SCRIPT_DIR%\src\CountOrSell.sln"
 set "API_PORT=5000"
+set "WEB_PORT=5173"
+
+:: ── Argument parsing ─────────────────────────────────────────────────────────
+
+:parse_args
+if "%~1"=="" goto end_args
+if /i "%~1"=="--api-port" (
+    set "API_PORT=%~2"
+    shift & shift
+    goto parse_args
+)
+if /i "%~1"=="--web-port" (
+    set "WEB_PORT=%~2"
+    shift & shift
+    goto parse_args
+)
+echo [WARN] Unknown argument: %~1
+shift
+goto parse_args
+:end_args
 
 :: ── Preflight checks ─────────────────────────────────────────────────────────
 
 where dotnet >nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] 'dotnet' not found. Please install the .NET SDK.
+    echo [ERROR] 'dotnet' not found. Please install the .NET 8 SDK.
+    echo         Download: https://dotnet.microsoft.com/download
     pause & exit /b 1
 )
 
 where npm >nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] 'npm' not found. Please install Node.js.
+    echo [ERROR] 'npm' not found. Please install Node.js ^(LTS recommended^).
+    echo         Download: https://nodejs.org/
     pause & exit /b 1
 )
 
@@ -111,7 +142,7 @@ echo [%time:~0,8%] Starting frontend dev server...
     echo @echo off
     echo title CountOrSell Frontend
     echo cd /d "%WEB_DIR%"
-    echo npm run dev
+    echo npm run dev -- --port %WEB_PORT%
     echo pause
 )
 start "CountOrSell Frontend" cmd /k "%TEMP%\cos_web.bat"
@@ -122,7 +153,7 @@ echo.
 echo ================================================
 echo   API            http://localhost:%API_PORT%
 echo   API ^(Swagger^)  http://localhost:%API_PORT%/swagger
-echo   Frontend       http://localhost:5173
+echo   Frontend       http://localhost:%WEB_PORT%
 echo ================================================
 echo   Close the API and Frontend windows to stop services.
 echo.
