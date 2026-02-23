@@ -54,6 +54,15 @@ start.bat
 
 Both scripts start the API on `http://localhost:5000` and the frontend dev server on `http://localhost:5173`. Open `http://localhost:5173` in your browser.
 
+To use different ports, pass `--api-port` and/or `--web-port`:
+
+```bash
+./start.sh --api-port 7000 --web-port 3000   # Linux / macOS / Git Bash
+start.bat --api-port 7000 --web-port 3000    # Windows
+```
+
+If `dotnet` or `npm` are not found, the scripts print a download link and exit.
+
 ### 3. Populate the database (first time only)
 
 The database starts empty. Use the synchronize from user interface to pull a clean copy.  If you'd prefer to build it yourself (without customizations/user content from the maintained database) you can use the CLI to pull data from Scryfall:
