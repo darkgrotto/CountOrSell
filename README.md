@@ -170,3 +170,11 @@ Docker (Linux containers), Azure Container Apps, Azure Container Registry, Azure
 **Data**
 
 Scryfall API (card/set data), MTGJSON (supplemental)
+
+---
+
+## License
+
+This work is licensed under [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International](https://creativecommons.org/licenses/by-nc-sa/4.0/).
+
+[![CC BY-NC-SA 4.0](https://mirrors.creativecommons.org/presskit/buttons/88x31/svg/by-nc-sa.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
