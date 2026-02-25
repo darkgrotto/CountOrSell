@@ -52,7 +52,7 @@ The script prompts for all required values — JWT secret, admin password, ports
 **1. Clone**
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/darkgrotto/CountOrSell
 cd CountOrSell
 ```
 

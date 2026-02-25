@@ -67,7 +67,7 @@ npm --version
 ### Get the code
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/darkgrotto/CountOrSell
 cd CountOrSell
 ```
 
@@ -149,7 +149,7 @@ Docker Desktop for Windows runs Linux containers by default via WSL 2. CountOrSe
 ### Get the code
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/darkgrotto/CountOrSell
 cd CountOrSell
 ```
 
