@@ -145,15 +145,20 @@ function App() {
       <footer className="bg-gray-800 text-gray-400 py-4 mt-8">
         <div className="container mx-auto px-4 text-center text-sm">
           <p className="mb-1">CountOrSell: {tagline}</p>
-          <p>Data provided by{' '}
-          <a
-            href="https://scryfall.com"
-            className="text-blue-400 hover:underline"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Scryfall
-          </a></p>
+          <p className="mb-1">Data provided by{' '}
+            <a href="https://scryfall.com" className="text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">Scryfall</a>
+          </p>
+          <p>
+            <a href="https://github.com/darkgrotto/CountOrSell/" className="text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">CountOrSell</a>
+            {' '}© 2026 by{' '}
+            <a href="https://www.darkgrotto.com" className="text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">Brian Mork</a>
+            {' '}is licensed under{' '}
+            <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" className="text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">CC BY-NC-SA 4.0</a>
+            <img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="" style={{ maxWidth: '1em', maxHeight: '1em', marginLeft: '.2em', display: 'inline' }} />
+            <img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="" style={{ maxWidth: '1em', maxHeight: '1em', marginLeft: '.2em', display: 'inline' }} />
+            <img src="https://mirrors.creativecommons.org/presskit/icons/nc.svg" alt="" style={{ maxWidth: '1em', maxHeight: '1em', marginLeft: '.2em', display: 'inline' }} />
+            <img src="https://mirrors.creativecommons.org/presskit/icons/sa.svg" alt="" style={{ maxWidth: '1em', maxHeight: '1em', marginLeft: '.2em', display: 'inline' }} />
+          </p>
         </div>
       </footer>
     </div>
