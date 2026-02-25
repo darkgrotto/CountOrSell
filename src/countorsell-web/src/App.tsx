@@ -149,10 +149,9 @@ function App() {
             <a href="https://scryfall.com" className="text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">Scryfall</a>
           </p>
           <p>
-            <a href="https://github.com/darkgrotto/CountOrSell/" className="text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">CountOrSell</a>
-            {' '}© 2026 by{' '}
+            CountOrSell © 2026 by{' '}
             <a href="https://www.darkgrotto.com" className="text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">Brian Mork</a>
-            {' '}/ {' '}
+            {' / '}
             <a href="https://www.darkgrotto.com" className="text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">Dark Grotto LLC</a>
             {' '}is licensed under{' '}
             <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" className="text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">CC BY-NC-SA 4.0</a>
