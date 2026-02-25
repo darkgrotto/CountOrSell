@@ -288,6 +288,8 @@ imagesCommand.SetHandler(async (string? setCode, bool all, bool missingOnly) =>
     }
 
     var downloaded = 0;
+    var noUrl = 0;
+    var failed = 0;
 
     await AnsiConsole.Progress()
         .AutoClear(false)
@@ -309,7 +311,11 @@ imagesCommand.SetHandler(async (string? setCode, bool all, bool missingOnly) =>
                 foreach (var card in setCards)
                 {
                     var imageUrl = GetImageUrl(card);
-                    if (imageUrl != null)
+                    if (imageUrl == null)
+                    {
+                        noUrl++;
+                    }
+                    else
                     {
                         var setDir = Path.Combine(imagesRoot, card.SetCode);
                         Directory.CreateDirectory(setDir);
@@ -331,6 +337,10 @@ imagesCommand.SetHandler(async (string? setCode, bool all, bool missingOnly) =>
                                 setDownloaded++;
                                 totalTask.Description = $"Downloading images  \u2514 {setUpper}: {setDownloaded}/{setCards.Count}";
                             }
+                            else
+                            {
+                                failed++;
+                            }
                             await Task.Delay(75); // Rate limit
                         }
                     }
@@ -341,7 +351,10 @@ imagesCommand.SetHandler(async (string? setCode, bool all, bool missingOnly) =>
             await db.SaveChangesAsync();
         });
 
-    AnsiConsole.WriteLine($"Downloaded {downloaded} images.");
+    var parts = new List<string> { $"Downloaded {downloaded} image{(downloaded == 1 ? "" : "s")}." };
+    if (noUrl > 0) parts.Add($"{noUrl} skipped (no image URL in Scryfall data).");
+    if (failed > 0) parts.Add($"{failed} failed (download error).");
+    AnsiConsole.WriteLine(string.Join("  ", parts));
 }, imgSetCodeOption, imgAllOption, imgMissingOption);
 
 rootCommand.AddCommand(imagesCommand);
