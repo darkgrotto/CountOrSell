@@ -152,6 +152,8 @@ function App() {
             <a href="https://github.com/darkgrotto/CountOrSell/" className="text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">CountOrSell</a>
             {' '}© 2026 by{' '}
             <a href="https://www.darkgrotto.com" className="text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">Brian Mork</a>
+            {' '}/ {' '}
+            <a href="https://www.darkgrotto.com" className="text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">Dark Grotto LLC</a>
             {' '}is licensed under{' '}
             <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" className="text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">CC BY-NC-SA 4.0</a>
             <img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="" style={{ maxWidth: '1em', maxHeight: '1em', marginLeft: '.2em', display: 'inline' }} />
