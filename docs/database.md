@@ -8,15 +8,19 @@ CountOrSell uses **SQLite** via Entity Framework Core. There are no migration fi
 
 ## Database File Location
 
-The database file is named `CountOrSell.db` and lives next to the running binary.
+The database file is named `CountOrSell.db`. Its location depends on the deployment mode.
 
-| Context | Typical path |
-|---------|-------------|
-| API (development) | `src/CountOrSell.Api/bin/Debug/net8.0/CountOrSell.db` |
-| API (published) | Same directory as `CountOrSell.Api.exe` / `CountOrSell.Api` |
-| CLI (development) | `src/CountOrSell.Cli/bin/Debug/net8.0/CountOrSell.db` |
+| Deployment | Path |
+|------------|------|
+| Local — development | `src/CountOrSell.Api/database/CountOrSell.db` |
+| Local — published | Same directory as the `CountOrSell.Api` executable |
+| CLI — development | `src/CountOrSell.Cli/bin/Debug/net8.0/CountOrSell.db` |
+| Docker | `/data/database/CountOrSell.db` inside the container (named volume `countorsell_data`) |
+| Azure Container Apps | `/data/database/CountOrSell.db` inside the container (Azure Files share `cosdata`) |
 
-> In development the API and CLI each have their **own separate database file**. To share data, run both tools against the same file by publishing the API and placing the CLI output in the same directory.
+The path can be overridden with the `COS_DATABASE_PATH` environment variable — the API and CLI both respect it.
+
+> **Development note:** In development the API and CLI each use their own separate database file. To share data, run both against the same file by using `COS_DATABASE_PATH` or by publishing the API and placing the CLI output in the same directory.
 
 ---
 
@@ -37,18 +41,19 @@ The database file is named `CountOrSell.db` and lives next to the running binary
 |-------|---------|
 | `Users` | Registered accounts (username, bcrypt password hash) |
 | `RefreshTokens` | JWT refresh tokens (rotated on each use) |
-| `CardOwnerships` | Which cards a user owns, per set |
+| `CardOwnerships` | Which cards a user owns, including variant and quantity |
 | `ReserveListCardOwnerships` | Reserved-list card ownership per user |
 | `BoosterDefinitions` | Tracked booster packs per user |
 | `SlabbedCards` | Professionally graded cards per user |
 | `UserSubmissions` | Proposed data changes awaiting admin review |
 | `UserSubmissionItems` | Individual change items within a submission |
+| `AppSettings` | Global settings (e.g. registrations enabled) |
 
 ### Key constraints
 
 - `Users.Username` — unique
 - `RefreshTokens.Token` — unique
-- `CardOwnerships (UserId, ScryfallCardId)` — unique
+- `CardOwnerships (UserId, ScryfallCardId, Variant)` — unique
 - `ReserveListCardOwnerships (UserId, ScryfallCardId)` — unique
 - `BoosterDefinitions (UserId, SetCode, BoosterType, ArtVariant)` — unique
 - `SlabbedCards (UserId, GradingCompany, CertificationNumber)` — unique
@@ -58,10 +63,10 @@ The database file is named `CountOrSell.db` and lives next to the running binary
 
 ## Schema Management
 
-The database is never migrated through EF Core migrations. Instead, two methods run on every startup:
+The database is never migrated through EF Core migrations. Instead, two methods run on every API startup:
 
 ```
-db.Database.EnsureCreated()   → creates all tables that EF knows about if the file is new
+db.Database.EnsureCreated()   → creates all tables if the file is new
 db.EnsureSchemaUpToDate()     → runs CREATE TABLE IF NOT EXISTS for tables added after initial creation
 ```
 
@@ -78,14 +83,116 @@ This pattern is safe to run repeatedly — `IF NOT EXISTS` makes it idempotent.
 
 ## Backups
 
+### Local
+
 SQLite is a single file. Back it up by copying `CountOrSell.db` while the API is stopped, or use the [SQLite Online Backup API](https://www.sqlite.org/backup.html) for a hot backup.
 
 ```bash
-# Simple file copy (stop API first, or use SQLite's backup mode)
-cp CountOrSell.db "CountOrSell-$(date +%Y%m%d).db"
+# Simple copy (stop the API first, or use SQLite backup mode for a hot copy)
+cp src/CountOrSell.Api/database/CountOrSell.db \
+   "CountOrSell-$(date +%Y%m%d).db"
 ```
 
-User data (accounts, ownerships, boosters, slabs) is only in this file. Card/set data can be re-synced from Scryfall at any time using the CLI.
+### Docker
+
+The database lives inside the named volume `countorsell_data`. Back it up by copying the file out of the volume:
+
+```bash
+# Copy the database to the host
+docker run --rm \
+  -v countorsell_data:/data \
+  -v $(pwd):/backup \
+  alpine cp /data/database/CountOrSell.db /backup/CountOrSell-backup.db
+```
+
+Or stop the container and access the volume directly:
+
+```bash
+docker compose down
+docker run --rm \
+  -v countorsell_data:/data \
+  -v $(pwd):/backup \
+  alpine cp /data/database/CountOrSell.db /backup/CountOrSell-backup.db
+docker compose up -d
+```
+
+To restore:
+
+```bash
+docker compose down
+docker run --rm \
+  -v countorsell_data:/data \
+  -v $(pwd):/backup \
+  alpine cp /backup/CountOrSell-backup.db /data/database/CountOrSell.db
+docker compose up -d
+```
+
+### Azure
+
+The database is stored on an Azure Files share (`cosdata`). Back it up using `azcopy` or the Azure Portal:
+
+```bash
+# Using azcopy (recommended for large databases)
+azcopy copy \
+  'https://<storage-account>.file.core.windows.net/cosdata/database/CountOrSell.db<SAS-token>' \
+  './CountOrSell-backup.db'
+```
+
+Or download via the Azure Portal: **Storage Account → File shares → cosdata → database → CountOrSell.db → Download**.
+
+User data (accounts, ownerships, boosters, slabs) is only in this file. Card and set data can be re-synced from Scryfall at any time using the CLI.
+
+---
+
+## Docker and Azure
+
+### Persistent storage
+
+The `/data` directory inside the container is the root for all persistent data. It contains two subdirectories:
+
+| Path | Contents |
+|------|---------|
+| `/data/database/` | SQLite database file |
+| `/data/images/` | Cached card images |
+
+**Docker:** Mounted from the named volume `countorsell_data`.
+**Azure:** Mounted from the Azure Files share `cosdata`.
+
+Neither the database nor the images are baked into the Docker image — they are always stored in the mounted volume.
+
+### Running the CLI against a Docker database
+
+The CLI runs on the host and cannot directly access the container's volume path. Options:
+
+**Option 1 — Copy the database out, operate, copy back:**
+
+```bash
+# Extract
+docker run --rm -v countorsell_data:/data -v $(pwd):/work \
+  alpine cp /data/database/CountOrSell.db /work/CountOrSell.db
+
+# Run CLI against the copy
+COS_DATABASE_PATH=./CountOrSell.db \
+  dotnet run --project src/CountOrSell.Cli -- sync --sets
+
+# Push back (stop the API container first)
+docker compose down
+docker run --rm -v countorsell_data:/data -v $(pwd):/work \
+  alpine cp /work/CountOrSell.db /data/database/CountOrSell.db
+docker compose up -d
+```
+
+**Option 2 — Run the CLI from inside the container:**
+
+```bash
+# Install the .NET SDK in the container (temporary)
+docker exec -it countorsell bash
+# Then run dotnet commands against the database at /data/database/CountOrSell.db
+```
+
+**Option 3 — Use the web UI sync** (recommended for card data updates):
+
+The in-app **Synchronize** feature downloads a pre-built database package directly, which is faster and requires no CLI access.
 
 ---
 
@@ -114,7 +221,7 @@ The client automatically prefers a delta from the current version. If no matchin
 
 If you are self-hosting and want to distribute data updates to multiple instances, use the CLI `publish` command. See [CLI Reference](cli.md#publish--build-update-packages) for details.
 
-The manifest JSON format that the API expects:
+The manifest JSON format:
 
 ```json
 {
@@ -132,7 +239,7 @@ The manifest JSON format that the API expects:
       "version": "2025.06.01.1200",
       "fromVersion": "2025.05.01.0900",
       "type": "delta",
-      "description": "Delta from 2025.05.01.0900: 12 new/updated sets, 400 new/updated cards",
+      "description": "Delta from 2025.05.01.0900: 12 sets, 400 cards",
       "downloadUrl": "https://example.com/dbupdate/packages/delta-2025.05.01.0900-to-2025.06.01.1200.zip",
       "fileSizeBytes": 524288,
       "checksum": "DEF456..."
@@ -140,8 +247,6 @@ The manifest JSON format that the API expects:
   ]
 }
 ```
-
-Host this file at the URL configured in `UpdatesController.cs` (`ManifestUrl` constant).
 
 ---
 

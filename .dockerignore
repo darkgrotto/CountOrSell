@@ -1,0 +1,39 @@
+# Git
+.git
+.gitattributes
+.gitignore
+
+# Build output
+**/bin/
+**/obj/
+src/countorsell-web/dist/
+src/countorsell-web/node_modules/
+
+# Database and user data — never bake into the image
+src/CountOrSell.Api/database/
+src/CountOrSell.Api/images/
+
+# Docs and scripts (not needed in image)
+docs/
+*.md
+*.sh
+*.bat
+*.ps1
+install.ps1
+
+# IDE and OS
+.vs/
+.vscode/
+.idea/
+**/.DS_Store
+**/Thumbs.db
+
+# Test output
+**/TestResults/
+
+# Docker files (avoid context recursion)
+Dockerfile
+.dockerignore
+docker-compose*.yml
+.env
+.env.*

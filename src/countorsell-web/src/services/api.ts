@@ -192,6 +192,27 @@ export interface AdminUserInfo {
   lastLoginAt: string | null
 }
 
+export interface AdminStatusInfo {
+  // Users
+  totalUsers: number
+  activeUsers: number
+  disabledUsers: number
+  adminUsers: number
+  // Card data
+  totalSets: number
+  totalCards: number
+  lastCardSyncedAt: string | null
+  // Images
+  cardsWithImages: number
+  // Collection activity (all users)
+  totalOwnershipRecords: number
+  totalOwnedCopies: number
+  totalUniqueCardsOwned: number
+  reserveListCardsOwned: number
+  totalBoostersDefined: number
+  totalBoostersOwned: number
+}
+
 export function getCertVerificationUrl(company: string, certNumber: string): string | null {
   switch (company.toUpperCase()) {
     case 'PSA': return `https://www.psacard.com/cert/${certNumber}`
@@ -492,6 +513,11 @@ export const api = {
       const body = await res.json().catch(() => ({ error: 'Unknown error' }))
       throw new Error(body.error || `HTTP error ${res.status}`)
     }
+  },
+
+  async getAdminStatus(): Promise<AdminStatusInfo> {
+    const res = await fetch(`${API_BASE}/admin/status`, { headers: getAuthHeaders() })
+    return handleResponse<AdminStatusInfo>(res)
   },
 
   // --- Collection (authorized) ---

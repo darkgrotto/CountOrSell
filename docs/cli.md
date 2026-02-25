@@ -8,15 +8,31 @@ The `CountOrSell.Cli` tool is the admin companion to the API. It handles data ma
 dotnet run --project src/CountOrSell.Cli -- <command> [options]
 ```
 
-The CLI operates on the **same database** as the API. By default that file is resolved relative to the CLI binary's output directory:
+## Database path
 
-```
-src/CountOrSell.Cli/bin/Debug/net8.0/CountOrSell.db
+The CLI and the API each resolve the database path independently. By default both use a heuristic to find the repository root and look for the database there.
+
+| Context | Default database path |
+|---------|-----------------------|
+| CLI (development) | `src/CountOrSell.Api/database/CountOrSell.db` (resolved from repo root) |
+| API (development) | `src/CountOrSell.Api/database/CountOrSell.db` (resolved from repo root) |
+| Docker / published | Set via `COS_DATABASE_PATH` environment variable |
+
+In normal local development the CLI and API share the same database automatically because both look for the same file relative to the repository root.
+
+**Targeting a different database** — set `COS_DATABASE_PATH` before running the CLI:
+
+```bash
+# Linux / macOS
+COS_DATABASE_PATH=/path/to/other/CountOrSell.db \
+  dotnet run --project src/CountOrSell.Cli -- sync --sets
+
+# Windows PowerShell
+$env:COS_DATABASE_PATH = 'C:\path\to\other\CountOrSell.db'
+dotnet run --project src/CountOrSell.Cli -- sync --sets
 ```
 
-> **Note:** The CLI and the API each look for `CountOrSell.db` next to their own binary. In development they use **separate database files**. If you want the CLI to populate data that the API serves, point the CLI to the API's database by copying/symlinking, or always run the CLI against the published API's database file.
->
-> A common workflow: run `dotnet publish` for the API to a shared output folder, place the CLI binary in the same folder, and run both against the same `CountOrSell.db`.
+**Docker deployments** — the database lives inside the container's named volume. The recommended approach is to use the web UI's built-in **Synchronize** feature to update card data. If you need CLI access, see [Database → Running the CLI against a Docker database](database.md#running-the-cli-against-a-docker-database).
 
 ---
 
@@ -35,9 +51,14 @@ dotnet run --project src/CountOrSell.Cli -- sync [options]
 | `--sets` | Sync the set list only (fast, ~5 seconds) |
 | `--cards` | Refresh cards for every set that already has cached cards |
 | `--set-code <code>` | Sync cards for one specific set (e.g. `mh3`, `2x2`) |
-| `--all` | Sync the full set list **and** all cards for every previously-cached set |
+| `--all` | Sync the full set list **and** all cards for every set with a non-zero card count |
 
 Running `sync` with no options is equivalent to `--all`.
+
+Progress is shown as a live status bar:
+- A spinner while sets are being fetched from Scryfall
+- A progress bar with a set counter and elapsed time while upserting
+- For `--all` and `--cards`, the current set code is shown inline (`└ MH3`)
 
 **Examples:**
 
@@ -73,20 +94,24 @@ dotnet run --project src/CountOrSell.Cli -- images [options]
 | `--all` | — | Download images for every card in the database |
 | `--missing-only` | `true` | Skip cards that already have a local image |
 
+Progress is shown as a live status bar with a per-set counter (`└ DSK: 25/268`).
+
+Before the main download loop, the CLI performs a **pre-scan**: it checks whether any image files already exist on disk but are not recorded in the database (e.g. after a fresh sync), and heals those entries automatically.
+
 **Examples:**
 
 ```bash
-# Download only what's missing (safe to run repeatedly)
+# Download only what's missing (safe to run repeatedly — default behaviour)
 dotnet run --project src/CountOrSell.Cli -- images --all
-
-# Re-download all images for one set (overwrites existing)
-dotnet run --project src/CountOrSell.Cli -- images --set-code mh3 --missing-only false
 
 # Download images for a new set after syncing its cards
 dotnet run --project src/CountOrSell.Cli -- images --set-code dsk
+
+# Re-download all images for one set (overwrites existing)
+dotnet run --project src/CountOrSell.Cli -- images --set-code mh3 --missing-only false
 ```
 
-Images are saved as `<base-dir>/images/<scryfallCardId>.jpg`. The CLI rate-limits requests to ~13 per second (75 ms delay) to respect Scryfall's guidelines. A full image download for all MTG sets takes several hours.
+Images are saved under `<images-root>/<set-code>/<scryfallCardId>.jpg`. The images root defaults to `src/CountOrSell.Api/images/` and can be overridden with `COS_IMAGES_PATH`. The CLI rate-limits requests to ~13 per second (75 ms delay) to respect Scryfall's guidelines. A full download for all MTG sets takes several hours and totals approximately 11 GB.
 
 ---
 
@@ -115,7 +140,7 @@ dotnet run --project src/CountOrSell.Cli -- publish \
 Produces:
 ```
 /var/www/countorsell/dbupdate/
-├── dbupdate.json              ← manifest (host this at countorsell.com/dbupdate)
+├── dbupdate.json              ← manifest (host at the configured manifest URL)
 └── packages/
     └── full-2025.06.01.1200.zip
 ```
@@ -135,7 +160,7 @@ The delta ZIP contains only sets and cards that changed since the base database,
 **Package format:**
 
 Each ZIP contains:
-- `data.db` — a stripped SQLite file with only `CachedSets` and `CachedCards` (no user data)
+- `data.db` — a stripped SQLite file with only `CachedSets`, `CachedCards`, and `SetTags` (no user data)
 - `manifest.json` — version, type, and record counts
 
 ---
@@ -177,7 +202,7 @@ dotnet run --project src/CountOrSell.Cli -- review --approve-all
 
 ---
 
-## Global Help
+## Global help
 
 ```bash
 # Top-level help

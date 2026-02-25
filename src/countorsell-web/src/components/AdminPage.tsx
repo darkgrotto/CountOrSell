@@ -1,7 +1,34 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api, AdminUserInfo } from '../services/api'
+import { api, AdminUserInfo, AdminStatusInfo } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
+
+// ── Shared helpers ────────────────────────────────────────────────────────────
+
+type StatColor = 'blue' | 'green' | 'red' | 'purple' | 'amber' | 'gray'
+
+function StatCard({ label, value, color = 'blue' }: {
+  label: string
+  value: string | number
+  color?: StatColor
+}) {
+  const colorMap: Record<StatColor, string> = {
+    blue:   'text-blue-600',
+    green:  'text-green-600',
+    red:    'text-red-600',
+    purple: 'text-purple-600',
+    amber:  'text-amber-600',
+    gray:   'text-gray-400',
+  }
+  return (
+    <div className="bg-white rounded-lg shadow p-4">
+      <p className="text-xs text-gray-500 mb-1">{label}</p>
+      <p className={`text-2xl font-bold ${colorMap[color]}`}>{value}</p>
+    </div>
+  )
+}
+
+// ── Users & Settings tab ──────────────────────────────────────────────────────
 
 function AppSettingsPanel() {
   const queryClient = useQueryClient()
@@ -43,7 +70,7 @@ function AppSettingsPanel() {
   )
 }
 
-export default function AdminPage() {
+function UsersPanel() {
   const { user: currentUser } = useAuth()
   const queryClient = useQueryClient()
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -115,9 +142,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-6">Admin</h1>
-
+    <>
       <AppSettingsPanel />
 
       <h2 className="text-lg font-semibold mb-3">Users</h2>
@@ -264,6 +289,154 @@ export default function AdminPage() {
           <div className="text-center py-12 text-gray-400">No users found</div>
         )}
       </div>
+    </>
+  )
+}
+
+// ── System Status tab ─────────────────────────────────────────────────────────
+
+function StatusPanel() {
+  const { data: status, isLoading, isError } = useQuery({
+    queryKey: ['admin-status'],
+    queryFn: () => api.getAdminStatus(),
+  })
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+      </div>
+    )
+  }
+
+  if (isError || !status) {
+    return <div className="text-red-600 py-4">Failed to load status.</div>
+  }
+
+  return <StatusContent status={status} />
+}
+
+function StatusContent({ status }: { status: AdminStatusInfo }) {
+  const imagePct = status.totalCards > 0
+    ? Math.round((status.cardsWithImages / status.totalCards) * 100)
+    : 0
+
+  const fmt = (n: number) => n.toLocaleString()
+
+  return (
+    <div className="space-y-8">
+
+      {/* ── Users ── */}
+      <section>
+        <h2 className="text-lg font-semibold mb-3">Users</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <StatCard label="Total" value={fmt(status.totalUsers)} />
+          <StatCard label="Active" value={fmt(status.activeUsers)} color="green" />
+          <StatCard label="Disabled" value={fmt(status.disabledUsers)} color={status.disabledUsers > 0 ? 'red' : 'gray'} />
+          <StatCard label="Admins" value={fmt(status.adminUsers)} color="purple" />
+        </div>
+      </section>
+
+      {/* ── Card Data ── */}
+      <section>
+        <h2 className="text-lg font-semibold mb-3">Card Data</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <StatCard label="Sets" value={fmt(status.totalSets)} />
+          <StatCard label="Cards" value={fmt(status.totalCards)} />
+          <StatCard
+            label="Last Synced"
+            value={status.lastCardSyncedAt
+              ? new Date(status.lastCardSyncedAt).toLocaleDateString()
+              : 'Never'}
+            color={status.lastCardSyncedAt ? 'blue' : 'gray'}
+          />
+        </div>
+      </section>
+
+      {/* ── Local Images ── */}
+      <section>
+        <h2 className="text-lg font-semibold mb-3">Local Images</h2>
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex justify-between text-sm mb-2">
+            <span className="text-gray-600">Coverage</span>
+            <span className="font-medium text-gray-800">
+              {fmt(status.cardsWithImages)} / {fmt(status.totalCards)} cards
+              <span className="ml-2 text-blue-600 font-bold">({imagePct}%)</span>
+            </span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-3">
+            <div
+              className="bg-blue-500 h-3 rounded-full transition-all duration-500"
+              style={{ width: `${imagePct}%` }}
+            />
+          </div>
+          {status.totalCards > status.cardsWithImages && (
+            <p className="text-xs text-gray-400 mt-2">
+              {fmt(status.totalCards - status.cardsWithImages)} card{status.totalCards - status.cardsWithImages !== 1 ? 's' : ''} missing images
+            </p>
+          )}
+        </div>
+      </section>
+
+      {/* ── Collection Activity ── */}
+      <section>
+        <h2 className="text-lg font-semibold mb-3">
+          Collection Activity
+          <span className="ml-2 text-sm font-normal text-gray-400">across all users</span>
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <StatCard label="Total Copies Owned" value={fmt(status.totalOwnedCopies)} />
+          <StatCard label="Unique Cards Owned" value={fmt(status.totalUniqueCardsOwned)} />
+          <StatCard label="Ownership Records" value={fmt(status.totalOwnershipRecords)} color="gray" />
+          <StatCard label="Reserve List Cards Owned" value={fmt(status.reserveListCardsOwned)} color="amber" />
+          <StatCard
+            label="Boosters Owned"
+            value={status.totalBoostersDefined > 0
+              ? `${fmt(status.totalBoostersOwned)} / ${fmt(status.totalBoostersDefined)}`
+              : '—'}
+          />
+        </div>
+      </section>
+
+    </div>
+  )
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+
+type Tab = 'users' | 'status'
+
+export default function AdminPage() {
+  const [tab, setTab] = useState<Tab>('users')
+
+  const tabs: { id: Tab; label: string }[] = [
+    { id: 'users',  label: 'Users & Settings' },
+    { id: 'status', label: 'System Status' },
+  ]
+
+  return (
+    <div>
+      <h1 className="text-2xl font-bold mb-4">Admin</h1>
+
+      {/* Tab bar */}
+      <div className="flex border-b border-gray-200 mb-6">
+        {tabs.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              tab === t.id
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'users'  && <UsersPanel />}
+      {tab === 'status' && <StatusPanel />}
     </div>
   )
 }

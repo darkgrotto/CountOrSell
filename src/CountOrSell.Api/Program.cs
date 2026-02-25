@@ -39,8 +39,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 builder.Services.AddAuthorization();
 
-// Fixed data paths (relative to repo root)
-static string FindRepoRoot()
+// Data paths: environment variables take priority (Docker / Azure / production),
+// then fall back to the repo-root heuristic used in local development.
+static string? TryFindRepoRoot()
 {
     var dir = new DirectoryInfo(AppContext.BaseDirectory);
     while (dir != null)
@@ -49,12 +50,14 @@ static string FindRepoRoot()
             return dir.FullName;
         dir = dir.Parent;
     }
-    throw new InvalidOperationException("Could not find repository root (.git directory).");
+    return null;
 }
 
-var repoRoot   = FindRepoRoot();
-var dbPath     = Path.Combine(repoRoot, "src", "CountOrSell.Api", "database", "CountOrSell.db");
-var imagesRoot = Path.Combine(repoRoot, "src", "CountOrSell.Api", "images");
+var repoRoot   = TryFindRepoRoot();
+var dbPath     = Environment.GetEnvironmentVariable("COS_DATABASE_PATH")
+    ?? Path.Combine(repoRoot ?? AppContext.BaseDirectory, "src", "CountOrSell.Api", "database", "CountOrSell.db");
+var imagesRoot = Environment.GetEnvironmentVariable("COS_IMAGES_PATH")
+    ?? Path.Combine(repoRoot ?? AppContext.BaseDirectory, "src", "CountOrSell.Api", "images");
 Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
 Directory.CreateDirectory(imagesRoot);
 
@@ -106,9 +109,21 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+// Serve the React SPA from wwwroot in production (Docker / Azure builds).
+// In development the Vite dev server handles the frontend separately.
+if (!app.Environment.IsDevelopment())
+{
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
+}
+
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+
+// SPA fallback: unmatched routes return index.html so React Router works.
+if (!app.Environment.IsDevelopment())
+    app.MapFallbackToFile("index.html");
 
 app.Run();

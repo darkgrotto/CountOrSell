@@ -3,6 +3,8 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Spectre.Console;
+using Spectre.Console.Rendering;
 using CountOrSell.Cli.Services;
 using CountOrSell.Core.Data;
 using CountOrSell.Core.Entities;
@@ -72,96 +74,158 @@ syncCommand.SetHandler(async (bool sets, bool cards, string? setCode, bool all) 
 {
     using var db = new CountOrSellDbContext(dbOptions);
 
+    // ── sync --all or default (no options) ───────────────────────────────────
     if (all || (!sets && !cards && setCode == null))
     {
-        Console.WriteLine("Syncing all sets from Scryfall...");
-        var scryfallSets = await scryfall.GetSetsAsync();
-        var now = DateTime.UtcNow;
         var count = 0;
+        var tagged = 0;
+        var totalCardsSynced = 0;
 
-        foreach (var s in scryfallSets)
-        {
-            var existing = await db.CachedSets.FindAsync(s.Id);
-            if (existing != null)
+        await AnsiConsole.Progress()
+            .AutoClear(false)
+            .HideCompleted(false)
+            .Columns(new TaskDescriptionColumn(), new ProgressBarColumn(), new PercentageColumn(), new CounterColumn(), new ElapsedTimeColumn())
+            .StartAsync(async ctx =>
             {
-                existing.Code = s.Code; existing.Name = s.Name; existing.ReleasedAt = s.ReleasedAt;
-                existing.SetType = s.SetType; existing.CardCount = s.CardCount;
-                existing.IconSvgUri = s.IconSvgUri; existing.ScryfallUri = s.ScryfallUri;
-                existing.LastSyncedAt = now;
-            }
-            else
-            {
-                db.CachedSets.Add(new CachedSet
+                var fetchTask = ctx.AddTask("Fetching sets from Scryfall", maxValue: 0);
+                var scryfallSets = await scryfall.GetSetsAsync();
+                fetchTask.MaxValue = 1;
+                fetchTask.Increment(1);
+
+                var upsertTask = ctx.AddTask("Syncing sets", maxValue: scryfallSets.Count);
+                var now = DateTime.UtcNow;
+                foreach (var s in scryfallSets)
                 {
-                    Id = s.Id, Code = s.Code, Name = s.Name, ReleasedAt = s.ReleasedAt,
-                    SetType = s.SetType, CardCount = s.CardCount, IconSvgUri = s.IconSvgUri,
-                    ScryfallUri = s.ScryfallUri, LastSyncedAt = now
-                });
-            }
-            count++;
-        }
-        await db.SaveChangesAsync();
-        await ApplyAutoTagsAsync(db, scryfallSets);
-        Console.WriteLine($"Synced {count} sets.");
+                    var existing = await db.CachedSets.FindAsync(s.Id);
+                    if (existing != null)
+                    {
+                        existing.Code = s.Code; existing.Name = s.Name; existing.ReleasedAt = s.ReleasedAt;
+                        existing.SetType = s.SetType; existing.CardCount = s.CardCount;
+                        existing.IconSvgUri = s.IconSvgUri; existing.ScryfallUri = s.ScryfallUri;
+                        existing.LastSyncedAt = now;
+                    }
+                    else
+                    {
+                        db.CachedSets.Add(new CachedSet
+                        {
+                            Id = s.Id, Code = s.Code, Name = s.Name, ReleasedAt = s.ReleasedAt,
+                            SetType = s.SetType, CardCount = s.CardCount, IconSvgUri = s.IconSvgUri,
+                            ScryfallUri = s.ScryfallUri, LastSyncedAt = now
+                        });
+                    }
+                    count++;
+                    upsertTask.Increment(1);
+                }
+                await db.SaveChangesAsync();
+                tagged = await ApplyAutoTagsAsync(db, scryfallSets);
 
-        if (all)
-        {
-            var allSetCodes = await db.CachedSets.Where(s => s.CardCount > 0).Select(s => s.Code).ToListAsync();
-            Console.WriteLine($"Syncing cards for {allSetCodes.Count} sets...");
-            foreach (var code in allSetCodes)
-            {
-                var cardCount = await SyncCardsForSet(db, code);
-                Console.WriteLine($"  {code}: {cardCount} cards");
-            }
-        }
+                if (all)
+                {
+                    var allSetCodes = await db.CachedSets.Where(s => s.CardCount > 0).Select(s => s.Code).ToListAsync();
+                    var cardsTask = ctx.AddTask("Syncing cards", maxValue: allSetCodes.Count);
+                    foreach (var code in allSetCodes)
+                    {
+                        cardsTask.Description = $"Syncing cards  \u2514 {code.ToUpperInvariant()}";
+                        var cardCount = await SyncCardsForSet(db, code);
+                        totalCardsSynced += cardCount;
+                        cardsTask.Increment(1);
+                    }
+                    cardsTask.Description = "Syncing cards";
+                }
+            });
+
+        AnsiConsole.WriteLine($"Synced {count} sets.");
+        if (tagged > 0) AnsiConsole.WriteLine($"Auto-tagged {tagged} set(s).");
+        if (all) AnsiConsole.WriteLine($"Synced {totalCardsSynced} total cards across all sets.");
         return;
     }
 
+    // ── sync --sets ──────────────────────────────────────────────────────────
     if (sets)
     {
-        Console.WriteLine("Syncing sets...");
-        var scryfallSets = await scryfall.GetSetsAsync();
-        var now = DateTime.UtcNow;
-        foreach (var s in scryfallSets)
-        {
-            var existing = await db.CachedSets.FindAsync(s.Id);
-            if (existing != null)
+        var count = 0;
+        var tagged = 0;
+
+        await AnsiConsole.Progress()
+            .AutoClear(false)
+            .HideCompleted(false)
+            .Columns(new TaskDescriptionColumn(), new ProgressBarColumn(), new PercentageColumn(), new CounterColumn(), new ElapsedTimeColumn())
+            .StartAsync(async ctx =>
             {
-                existing.Code = s.Code; existing.Name = s.Name; existing.ReleasedAt = s.ReleasedAt;
-                existing.SetType = s.SetType; existing.CardCount = s.CardCount;
-                existing.IconSvgUri = s.IconSvgUri; existing.ScryfallUri = s.ScryfallUri;
-                existing.LastSyncedAt = now;
-            }
-            else
-            {
-                db.CachedSets.Add(new CachedSet
+                var fetchTask = ctx.AddTask("Fetching sets from Scryfall", maxValue: 0);
+                var scryfallSets = await scryfall.GetSetsAsync();
+                fetchTask.MaxValue = 1;
+                fetchTask.Increment(1);
+
+                var upsertTask = ctx.AddTask("Syncing sets", maxValue: scryfallSets.Count);
+                var now = DateTime.UtcNow;
+                foreach (var s in scryfallSets)
                 {
-                    Id = s.Id, Code = s.Code, Name = s.Name, ReleasedAt = s.ReleasedAt,
-                    SetType = s.SetType, CardCount = s.CardCount, IconSvgUri = s.IconSvgUri,
-                    ScryfallUri = s.ScryfallUri, LastSyncedAt = now
-                });
-            }
-        }
-        await db.SaveChangesAsync();
-        await ApplyAutoTagsAsync(db, scryfallSets);
-        Console.WriteLine($"Synced {scryfallSets.Count} sets.");
+                    var existing = await db.CachedSets.FindAsync(s.Id);
+                    if (existing != null)
+                    {
+                        existing.Code = s.Code; existing.Name = s.Name; existing.ReleasedAt = s.ReleasedAt;
+                        existing.SetType = s.SetType; existing.CardCount = s.CardCount;
+                        existing.IconSvgUri = s.IconSvgUri; existing.ScryfallUri = s.ScryfallUri;
+                        existing.LastSyncedAt = now;
+                    }
+                    else
+                    {
+                        db.CachedSets.Add(new CachedSet
+                        {
+                            Id = s.Id, Code = s.Code, Name = s.Name, ReleasedAt = s.ReleasedAt,
+                            SetType = s.SetType, CardCount = s.CardCount, IconSvgUri = s.IconSvgUri,
+                            ScryfallUri = s.ScryfallUri, LastSyncedAt = now
+                        });
+                    }
+                    count++;
+                    upsertTask.Increment(1);
+                }
+                await db.SaveChangesAsync();
+                tagged = await ApplyAutoTagsAsync(db, scryfallSets);
+            });
+
+        AnsiConsole.WriteLine($"Synced {count} sets.");
+        if (tagged > 0) AnsiConsole.WriteLine($"Auto-tagged {tagged} set(s).");
     }
 
+    // ── sync --cards (re-sync all sets that already have cards) ──────────────
     if (cards && setCode == null)
     {
         var syncedSetCodes = await db.CachedCards.Select(c => c.SetCode).Distinct().ToListAsync();
-        foreach (var code in syncedSetCodes)
-        {
-            var cardCount = await SyncCardsForSet(db, code);
-            Console.WriteLine($"  {code}: {cardCount} cards");
-        }
+        var totalSynced = 0;
+
+        await AnsiConsole.Progress()
+            .AutoClear(false)
+            .HideCompleted(false)
+            .Columns(new TaskDescriptionColumn(), new ProgressBarColumn(), new PercentageColumn(), new CounterColumn(), new ElapsedTimeColumn())
+            .StartAsync(async ctx =>
+            {
+                var cardsTask = ctx.AddTask("Syncing cards", maxValue: syncedSetCodes.Count);
+                foreach (var code in syncedSetCodes)
+                {
+                    cardsTask.Description = $"Syncing cards  \u2514 {code.ToUpperInvariant()}";
+                    var cardCount = await SyncCardsForSet(db, code);
+                    totalSynced += cardCount;
+                    cardsTask.Increment(1);
+                }
+                cardsTask.Description = "Syncing cards";
+            });
+
+        AnsiConsole.WriteLine($"Synced {totalSynced} total cards.");
     }
 
+    // ── sync --set-code X ────────────────────────────────────────────────────
     if (setCode != null)
     {
-        Console.WriteLine($"Syncing cards for set {setCode}...");
-        var cardCount = await SyncCardsForSet(db, setCode);
-        Console.WriteLine($"Synced {cardCount} cards for {setCode}.");
+        int cardCount = 0;
+        await AnsiConsole.Status()
+            .Spinner(Spinner.Known.Dots)
+            .StartAsync($"Syncing {setCode.ToUpperInvariant()}...", async _ =>
+            {
+                cardCount = await SyncCardsForSet(db, setCode);
+            });
+        AnsiConsole.WriteLine($"Synced {cardCount} cards for {setCode.ToUpperInvariant()}.");
     }
 }, syncSetsOption, syncCardsOption, syncSetCodeOption, syncAllOption);
 
@@ -180,46 +244,104 @@ imagesCommand.SetHandler(async (string? setCode, bool all, bool missingOnly) =>
 {
     using var db = new CountOrSellDbContext(dbOptions);
 
+    // Pre-scan: check disk for images that exist but aren't tracked in DB
+    var healed = 0;
+    if (missingOnly)
+    {
+        await AnsiConsole.Status()
+            .Spinner(Spinner.Known.Dots)
+            .StartAsync("Scanning disk for existing images...", async _ =>
+            {
+                var setCodeNorm = setCode?.ToLowerInvariant();
+                var untracked = await db.CachedCards
+                    .Where(c => (c.LocalImagePath == null || c.LocalImagePath == "") &&
+                                (setCodeNorm == null || c.SetCode == setCodeNorm))
+                    .ToListAsync();
+
+                foreach (var card in untracked)
+                {
+                    var rel = Path.Combine(card.SetCode, $"{card.Id}.jpg");
+                    if (File.Exists(Path.Combine(imagesRoot, rel)))
+                    {
+                        card.LocalImagePath = rel;
+                        healed++;
+                    }
+                }
+                if (healed > 0)
+                    await db.SaveChangesAsync();
+            });
+
+        if (healed > 0)
+            AnsiConsole.WriteLine($"Found {healed} image(s) already on disk — updated database.");
+    }
+
     IQueryable<CachedCard> query = db.CachedCards;
     if (setCode != null) query = query.Where(c => c.SetCode == setCode.ToLowerInvariant());
     if (missingOnly) query = query.Where(c => c.LocalImagePath == null || c.LocalImagePath == "");
 
-    var cards = await query.ToListAsync();
-    Console.WriteLine($"Downloading images for {cards.Count} cards...");
+    var cards = await query.OrderBy(c => c.SetCode).ThenBy(c => c.CollectorNumber).ToListAsync();
 
-    var downloaded = 0;
-    foreach (var card in cards)
+    if (cards.Count == 0)
     {
-        var imageUrl = GetImageUrl(card);
-        if (imageUrl == null) continue;
-
-        var setDir      = Path.Combine(imagesRoot, card.SetCode);
-        Directory.CreateDirectory(setDir);
-        var relativePath = Path.Combine(card.SetCode, $"{card.Id}.jpg");
-        var absolutePath = Path.Combine(imagesRoot, relativePath);
-
-        if (missingOnly && File.Exists(absolutePath))
-        {
-            card.LocalImagePath = relativePath;
-            continue;
-        }
-
-        var bytes = await scryfall.DownloadImageAsync(imageUrl);
-        if (bytes != null)
-        {
-            await File.WriteAllBytesAsync(absolutePath, bytes);
-            card.LocalImagePath = relativePath;
-            downloaded++;
-
-            if (downloaded % 50 == 0)
-                Console.WriteLine($"  Downloaded {downloaded} images...");
-        }
-
-        await Task.Delay(75); // Rate limit
+        AnsiConsole.WriteLine("No images to download.");
+        return;
     }
 
-    await db.SaveChangesAsync();
-    Console.WriteLine($"Downloaded {downloaded} images.");
+    var downloaded = 0;
+
+    await AnsiConsole.Progress()
+        .AutoClear(false)
+        .HideCompleted(false)
+        .Columns(new TaskDescriptionColumn(), new ProgressBarColumn(), new PercentageColumn(), new CounterColumn(), new ElapsedTimeColumn())
+        .StartAsync(async ctx =>
+        {
+            var totalTask = ctx.AddTask("Downloading images", maxValue: cards.Count);
+            var bySet = cards.GroupBy(c => c.SetCode).OrderBy(g => g.Key).ToList();
+
+            foreach (var setGroup in bySet)
+            {
+                var setCards = setGroup.ToList();
+                var setUpper = setGroup.Key.ToUpperInvariant();
+                var setDownloaded = 0;
+
+                totalTask.Description = $"Downloading images  \u2514 {setUpper}: {setDownloaded}/{setCards.Count}";
+
+                foreach (var card in setCards)
+                {
+                    var imageUrl = GetImageUrl(card);
+                    if (imageUrl != null)
+                    {
+                        var setDir = Path.Combine(imagesRoot, card.SetCode);
+                        Directory.CreateDirectory(setDir);
+                        var relativePath = Path.Combine(card.SetCode, $"{card.Id}.jpg");
+                        var absolutePath = Path.Combine(imagesRoot, relativePath);
+
+                        if (missingOnly && File.Exists(absolutePath))
+                        {
+                            card.LocalImagePath = relativePath;
+                        }
+                        else
+                        {
+                            var bytes = await scryfall.DownloadImageAsync(imageUrl);
+                            if (bytes != null)
+                            {
+                                await File.WriteAllBytesAsync(absolutePath, bytes);
+                                card.LocalImagePath = relativePath;
+                                downloaded++;
+                                setDownloaded++;
+                                totalTask.Description = $"Downloading images  \u2514 {setUpper}: {setDownloaded}/{setCards.Count}";
+                            }
+                            await Task.Delay(75); // Rate limit
+                        }
+                    }
+                    totalTask.Increment(1);
+                }
+            }
+
+            await db.SaveChangesAsync();
+        });
+
+    AnsiConsole.WriteLine($"Downloaded {downloaded} images.");
 }, imgSetCodeOption, imgAllOption, imgMissingOption);
 
 rootCommand.AddCommand(imagesCommand);
@@ -693,7 +815,7 @@ return await rootCommand.InvokeAsync(args);
 /// For each synced set that has a set_type with a known tag mapping, insert the corresponding
 /// SetTag row if it doesn't already exist. Manually applied tags are never removed.
 /// </summary>
-async Task ApplyAutoTagsAsync(CountOrSellDbContext db, List<MtgSet> sets)
+async Task<int> ApplyAutoTagsAsync(CountOrSellDbContext db, List<MtgSet> sets)
 {
     var existingTags = (await db.SetTags.ToListAsync())
         .Select(t => (t.SetCode, t.Tag))
@@ -712,10 +834,9 @@ async Task ApplyAutoTagsAsync(CountOrSellDbContext db, List<MtgSet> sets)
     }
 
     if (added > 0)
-    {
         await db.SaveChangesAsync();
-        Console.WriteLine($"Auto-tagged {added} set(s) from set_type.");
-    }
+
+    return added;
 }
 
 async Task<int> SyncCardsForSet(CountOrSellDbContext db, string setCode)
@@ -982,4 +1103,17 @@ string? GetImageUrl(CachedCard card)
         if (faces?[0]?.ImageUris?.Normal != null) return faces[0].ImageUris!.Normal;
     }
     return null;
+}
+
+/// <summary>
+/// Progress column that displays "current/max" counts.
+/// Renders blank for indeterminate (spinner) tasks.
+/// </summary>
+sealed class CounterColumn : ProgressColumn
+{
+    public override IRenderable Render(RenderOptions options, ProgressTask task, TimeSpan deltaTime)
+    {
+        if (task.IsIndeterminate) return new Text("        ");
+        return new Text($"{(int)task.Value}/{(int)task.MaxValue}", new Style(Color.Green));
+    }
 }

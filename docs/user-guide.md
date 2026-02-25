@@ -8,10 +8,12 @@ The navigation bar at the top of every page provides access to all sections. Som
 |----------|---------------|-------------|
 | **CountOrSell** (logo) | No | Returns to the Sets list |
 | **Sets** | No | Browse all MTG sets |
+| **Collection** | Yes | Cross-set view of your entire collection with stats and exports |
 | **Reserve List** | Yes | Track your Reserved List cards |
 | **Boosters** | Yes | Track your booster pack collection |
 | **Slabs** | Yes | Track professionally graded cards |
 | **Login / Logout** | — | Authentication |
+| **Admin** | Yes (admin only) | User management, system status, and app settings |
 
 The **Update** indicator (top-right area) shows when a newer card database is available.
 
@@ -19,12 +21,24 @@ The **Update** indicator (top-right area) shows when a newer card database is av
 
 ## Authentication
 
-### Registering
+### Default admin account
+
+A built-in admin account is created automatically on first startup:
+
+| Username | Default password |
+|----------|-----------------|
+| `cosadm` | `wholeftjaceinchargeofdesign` |
+
+**Change this password immediately after first login** via the user menu → **Profile → Change Password**. The minimum password length is 15 characters.
+
+### Registering a new account
 
 1. Click **Login** in the navigation bar
 2. Switch to the **Register** tab
-3. Enter a username (must be unique), password (minimum 6 characters), and an optional display name
+3. Enter a username (must be unique), password (minimum 15 characters), and an optional display name
 4. Click **Register** — you are logged in immediately
+
+> Registration can be disabled by an admin via **Admin → Users & Settings → Registrations**. If registration is closed, new accounts can only be created by an existing admin.
 
 ### Logging in
 
@@ -221,4 +235,11 @@ Several export formats are available from `Settings → Export` (accessible via 
 | `GET /api/export/reservelist/csv` | CSV | Owned Reserved List cards |
 | `GET /api/export/slabbed/pdf` | PDF | Full slabbed card collection |
 
-These endpoints require a valid JWT token. You can access them in the Swagger UI (`http://localhost:5000/swagger`) by authorizing with your token first.
+These endpoints require a valid JWT token. You can access them in the Swagger UI by authorizing with your token first.
+
+| Deployment | Swagger URL |
+|------------|-------------|
+| Local (development) | `http://localhost:5000/swagger` |
+| Docker (development mode) | `http://localhost:8080/swagger` (requires `ASPNETCORE_ENVIRONMENT=Development` in `docker-compose.yml`) |
+
+Swagger is disabled in Production mode for security. See [Running](running.md#swagger--openapi) for details.

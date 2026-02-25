@@ -15,22 +15,48 @@ CountOrSell is a self-hosted web application for tracking Magic: The Gathering c
 | **Core library** (`CountOrSell.Core`) | Shared entities, services, and EF Core context |
 | **CLI** (`CountOrSell.Cli`) | Admin tool — syncs Scryfall data, manages images, publishes update packages |
 | **Database** | SQLite file, auto-created on first run |
+| **Docker** | `Dockerfile` + `docker-compose.yml` for containerised deployment |
 
 ---
 
 ## Quick Start
 
-### Prerequisites
+### Option A — Automated installer (recommended)
 
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-- [Node.js 18+](https://nodejs.org/) and npm
+`install.ps1` is an interactive PowerShell script that works on Windows, Linux, and macOS (PowerShell 5.1+ or PowerShell Core 7+). It guides you through every step and supports three deployment modes.
 
-### 1. Clone and configure
+```powershell
+# Windows PowerShell / PowerShell Core
+./install.ps1
+
+# Linux / macOS (requires PowerShell Core)
+pwsh ./install.ps1
+```
+
+Choose your mode at the prompt:
+
+| Mode | Description |
+|------|-------------|
+| **Local** | Configure and run with `start.sh` / `start.bat` on the current machine |
+| **Docker** | Build a Docker image and run with `docker compose` |
+| **Azure** | Build, push to Azure Container Registry, and deploy to Azure Container Apps |
+
+The script prompts for all required values — JWT secret, admin password, ports, Azure credentials — and handles every configuration step automatically.
+
+---
+
+### Option B — Manual local setup
+
+**Prerequisites:** [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) and [Node.js 18+](https://nodejs.org/)
+
+**1. Clone**
 
 ```bash
 git clone <repo-url>
 cd CountOrSell
 ```
+
+**2. Configure**
 
 Edit `src/CountOrSell.Api/appsettings.json` and replace the JWT key with a random string of at least 32 characters:
 
@@ -40,65 +66,74 @@ Edit `src/CountOrSell.Api/appsettings.json` and replace the JWT key with a rando
 }
 ```
 
-### 2. Start everything
+**3. Start**
 
-**Linux / macOS / Git Bash on Windows:**
 ```bash
-./start.sh
+./start.sh                                  # Linux / macOS / Git Bash
+start.bat                                   # Windows cmd
 ```
 
-**Windows (native cmd):**
-```
-start.bat
-```
+Both scripts start the API on `http://localhost:5000` and the frontend on `http://localhost:5173`.
+Open `http://localhost:5173` in your browser.
 
-Both scripts start the API on `http://localhost:5000` and the frontend dev server on `http://localhost:5173`. Open `http://localhost:5173` in your browser.
-
-To use different ports, pass `--api-port` and/or `--web-port`:
+To use different ports:
 
 ```bash
 ./start.sh --api-port 7000 --web-port 3000   # Linux / macOS / Git Bash
 start.bat --api-port 7000 --web-port 3000    # Windows
 ```
 
-If `dotnet` or `npm` are not found, the scripts print a download link and exit.
+---
 
-### 3. Populate the database (first time only)
+### Option C — Docker
 
-The database starts empty. Use the synchronize from user interface to pull a clean copy.  If you'd prefer to build it yourself (without customizations/user content from the maintained database) you can use the CLI to pull data from Scryfall:
+**Prerequisites:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Linux container mode)
 
 ```bash
-# Sync all sets (fast, no cards yet)
+cp .env.example .env
+# Edit .env — set JWT_KEY to a random 32+ character string
+docker compose up -d
+```
+
+The app is available at `http://localhost:8080`. Change the port by setting `COS_PORT` in `.env`.
+
+---
+
+## Populate the database (first time only)
+
+The database starts empty. Use the **Synchronize** option in the web UI to pull the current maintained dataset, or use the CLI to build from Scryfall directly:
+
+```bash
+# Sync all sets (fast)
 dotnet run --project src/CountOrSell.Cli -- sync --sets
 
 # Sync cards for a specific set
 dotnet run --project src/CountOrSell.Cli -- sync --set-code mh3
 
-# Or sync everything at once (slow, ~30 min for all sets + cards)
+# Sync everything (slow — 20-40 minutes)
 dotnet run --project src/CountOrSell.Cli -- sync --all
 ```
 
-### 4. Populate the images (first time only)
-
-Due to the size of the image files it is HIGHLY recommended that you use the synchronize option from the user interface to pull down the complete set rather than querying all from the Scryfall data.  If it is desired to pull down the Scryfall images then use the following syntax:
+Card images are optional — without them the app falls back to direct Scryfall URLs. The full image set is ~11 GB and ~112,000 files. Use the UI sync or:
 
 ```bash
-# Sync all images for a particular set
-dotnet run --project src/CountOrSell.Cli -- images --set-code mh3
-
-# Sync all images (extremely slow)
-dotnet run --project src/CountOrSell.Cli -- images --all
+dotnet run --project src/CountOrSell.Cli -- images --set-code mh3   # one set
+dotnet run --project src/CountOrSell.Cli -- images --all             # everything
 ```
 
-Note that the Scryfall image set is approximately 112,000 files and around 11 GB of data as of February 2026, so this will take several hours to complete.
+---
 
-### 5. Default Admin
+## Default Admin Account
 
-There is a default user built into the system with username 'cosadm' and password 'wholeftjaceinchargeofdesign'
+A built-in admin account is created on first startup:
 
-** YOU SHOULD IMMEDIATELY LOGIN AND CHANGE THIS PASSWORD **
+| Username | Password |
+|----------|----------|
+| `cosadm` | `wholeftjaceinchargeofdesign` |
 
-Once the password has been changed, you may either create a regular user account and promote that to admin permssions or continue using the 'cosadm' account.
+**Change this password immediately after first login.** Go to the user menu → **Profile** → **Change Password**. The minimum password length is 15 characters.
+
+Once the password has been changed, you can create regular user accounts and promote them to admin via the **Admin** panel, or continue using the `cosadm` account.
 
 ---
 
@@ -106,10 +141,10 @@ Once the password has been changed, you may either create a regular user account
 
 | Document | Contents |
 |----------|---------|
-| [Installation](docs/installation.md) | System requirements, first-time setup, configuration |
-| [Running](docs/running.md) | Starting each service, ports, environment variables |
+| [Installation](docs/installation.md) | All install methods — local, Docker, Azure — with full configuration reference |
+| [Running](docs/running.md) | Starting, stopping, and managing each deployment mode |
 | [CLI Reference](docs/cli.md) | All `countorsell` CLI commands and options |
-| [Database](docs/database.md) | Schema, location, update system, backups |
+| [Database](docs/database.md) | Schema, location, backups, update system |
 | [User Guide](docs/user-guide.md) | How to use the web application |
 
 ---
@@ -128,5 +163,10 @@ React 18, TypeScript, Vite, TanStack Query, React Router, Tailwind CSS
 
 Capacitor (iOS / Android shells, optional)
 
+**Deployment**
+
+Docker (Linux containers), Azure Container Apps, Azure Container Registry, Azure Files
+
 **Data**
+
 Scryfall API (card/set data), MTGJSON (supplemental)

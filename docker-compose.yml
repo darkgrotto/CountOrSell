@@ -1,0 +1,39 @@
+# CountOrSell — Docker Compose
+#
+# Copy .env.example to .env and fill in your values, then run:
+#   docker compose up -d
+#
+# The app will be available at http://localhost:${COS_PORT:-8080}
+# Default admin: cosadm / wholeftjaceinchargeofdesign  — CHANGE THIS IMMEDIATELY
+
+services:
+  countorsell:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: countorsell:latest
+    container_name: countorsell
+    restart: unless-stopped
+    ports:
+      - "${COS_PORT:-8080}:8080"
+    volumes:
+      # Persistent data: SQLite database and card images
+      - cos_data:/data
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - Jwt__Key=${JWT_KEY:?JWT_KEY is required — copy .env.example to .env and set it}
+      - Jwt__Issuer=CountOrSell
+      - Jwt__Audience=CountOrSellUsers
+      - COS_DATABASE_PATH=/data/database/CountOrSell.db
+      - COS_IMAGES_PATH=/data/images
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/api/auth/registration-status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  cos_data:
+    name: countorsell_data

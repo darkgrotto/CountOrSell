@@ -1,41 +1,19 @@
 # Running
 
-## The Startup Scripts
+CountOrSell can be run in three modes. Choose the one that matches your install method.
 
-The easiest way to run both services together is the included startup script.
+---
 
-Both scripts accept optional flags to override the default ports:
+## Local (start scripts)
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--api-port PORT` | `5000` | Port for the ASP.NET Core API |
-| `--web-port PORT` | `5173` | Port for the Vite dev server |
+The startup scripts manage the API and frontend dev server together.
 
 ### Linux / macOS / Git Bash
 
 ```bash
-./start.sh                                    # defaults (5000 / 5173)
+./start.sh                                    # defaults (API: 5000, frontend: 5173)
 ./start.sh --api-port 7000 --web-port 3000    # custom ports
 ```
-
-```
-[12:00:00] CountOrSell — starting services
-────────────────────────────────────────
-[12:00:00] Restoring .NET packages...
-[12:00:02] Starting API on http://localhost:5000 ...
-[12:00:04] API is ready.
-[12:00:04] Installing frontend dependencies...
-[12:00:06] Starting frontend dev server...
-
-════════════════════════════════════════
-  API           http://localhost:5000
-  API (Swagger)  http://localhost:5000/swagger
-  Frontend      http://localhost:5173
-════════════════════════════════════════
-  Press Ctrl+C to stop all services.
-```
-
-Press **Ctrl+C** to stop both services cleanly.
 
 ### Windows (native cmd)
 
@@ -44,12 +22,19 @@ start.bat                                        :: defaults (5000 / 5173)
 start.bat --api-port 7000 --web-port 3000        :: custom ports
 ```
 
-On Windows, `start.bat` opens the API and frontend each in their own console window. Close those windows to stop the services. The original window can be closed once both services are running.
+On Windows, `start.bat` opens the API and frontend each in a separate console window.
+
+### Port flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--api-port PORT` | `5000` | Port for the ASP.NET Core API |
+| `--web-port PORT` | `5173` | Port for the Vite dev server |
 
 ### What the scripts do
 
 1. Check that `dotnet` and `npm` are on the PATH
-2. Kill any process already listening on port 5000
+2. Kill any process already listening on port 5000 (or the chosen API port)
 3. Clear the Vite dependency cache (prevents EPERM errors on OneDrive-synced paths)
 4. Run `dotnet restore` on the solution
 5. Start the API with `ASPNETCORE_ENVIRONMENT=Development`
@@ -57,9 +42,173 @@ On Windows, `start.bat` opens the API and frontend each in their own console win
 7. Run `npm install` in the frontend directory
 8. Start the Vite dev server
 
+Press **Ctrl+C** to stop both services.
+
+### Services
+
+| Service | Default URL | Notes |
+|---------|------------|-------|
+| API | `http://localhost:5000` | REST API + auth |
+| Swagger UI | `http://localhost:5000/swagger` | Available in Development mode |
+| Frontend | `http://localhost:5173` | Vite dev server; proxies `/api` to the API |
+
 ---
 
-## Running Services Individually
+## Docker
+
+### Start
+
+```bash
+docker compose up -d
+```
+
+The first run builds the image (~2–5 minutes). Subsequent starts are instant.
+
+Open `http://localhost:8080` (or the port configured in `.env` as `COS_PORT`).
+
+### Stop
+
+```bash
+docker compose down
+```
+
+This stops and removes the container but preserves the `countorsell_data` volume (your database and images).
+
+To also remove the volume (destroys all data):
+
+```bash
+docker compose down -v
+```
+
+### Logs
+
+```bash
+docker compose logs -f              # follow live output
+docker compose logs --tail=100      # last 100 lines
+```
+
+### Restart / update
+
+```bash
+# Restart the container without rebuilding
+docker compose restart
+
+# Rebuild the image after a code change, then restart
+docker compose up -d --build
+```
+
+### Environment variables
+
+Configuration is passed through `.env`. All options:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `JWT_KEY` | *(required)* | JWT signing secret, passed as `Jwt__Key` inside the container |
+| `COS_PORT` | `8080` | Host port mapped to the container's port 8080 |
+
+Advanced overrides can be added directly under `environment:` in `docker-compose.yml`:
+
+| Container env var | Default | Description |
+|-------------------|---------|-------------|
+| `Jwt__Issuer` | `CountOrSell` | JWT issuer claim |
+| `Jwt__Audience` | `CountOrSellUsers` | JWT audience claim |
+| `COS_DATABASE_PATH` | `/data/database/CountOrSell.db` | SQLite file path inside the container |
+| `COS_IMAGES_PATH` | `/data/images` | Card images root inside the container |
+| `ASPNETCORE_URLS` | `http://+:8080` | Listen address |
+| `ASPNETCORE_ENVIRONMENT` | `Production` | Set to `Development` to enable Swagger UI |
+
+### Accessing the container
+
+```bash
+# Open a shell inside the running container
+docker exec -it countorsell bash
+
+# Run a one-off command
+docker exec countorsell ls /data/database/
+```
+
+### Persistent data
+
+The named volume `countorsell_data` is mounted at `/data` inside the container.
+
+| Path in container | Contents |
+|-------------------|---------|
+| `/data/database/CountOrSell.db` | SQLite database |
+| `/data/images/` | Cached card images |
+
+The volume persists across container stops, restarts, and image updates. See [Database](database.md#docker-and-azure) for backup instructions.
+
+---
+
+## Azure (Container Apps)
+
+### View the app URL
+
+```bash
+az containerapp show \
+  --name <app-name> --resource-group <rg> \
+  --query 'properties.configuration.ingress.fqdn' --output tsv
+```
+
+### Follow live logs
+
+```bash
+az containerapp logs show \
+  --name <app-name> --resource-group <rg> \
+  --follow
+```
+
+### Restart the container
+
+```bash
+az containerapp revision restart \
+  --name <app-name> --resource-group <rg> \
+  --revision $(az containerapp revision list \
+      --name <app-name> --resource-group <rg> \
+      --query '[0].name' --output tsv)
+```
+
+### Update to a new image
+
+Build, push, and redeploy in three commands:
+
+```bash
+docker build -t <acr>.azurecr.io/countorsell:latest .
+docker push     <acr>.azurecr.io/countorsell:latest
+az containerapp update \
+  --name <app-name> --resource-group <rg> \
+  --image <acr>.azurecr.io/countorsell:latest
+```
+
+### Scale
+
+The app is deployed with `--min-replicas 1 --max-replicas 1` to keep SQLite consistent (multiple replicas would each need their own database). If you migrate to a server-based database engine in the future, scaling becomes straightforward.
+
+### Change a secret (e.g. JWT key rotation)
+
+```bash
+az containerapp secret set \
+  --name <app-name> --resource-group <rg> \
+  --secrets "jwt-key=<new-key>"
+
+az containerapp update \
+  --name <app-name> --resource-group <rg> \
+  --set-env-vars "Jwt__Key=secretref:jwt-key"
+```
+
+### Tear down
+
+```bash
+# Delete the Container App only (keeps storage and ACR)
+az containerapp delete --name <app-name> --resource-group <rg>
+
+# Delete everything (irreversible — back up your database first)
+az group delete --name <rg>
+```
+
+---
+
+## Running services individually (local)
 
 ### API only
 
@@ -75,7 +224,7 @@ $env:ASPNETCORE_ENVIRONMENT = "Development"
 dotnet run --project src/CountOrSell.Api --urls http://localhost:5000
 ```
 
-The API automatically creates the SQLite database and runs schema migrations on startup. No manual database setup is needed.
+The API automatically creates the SQLite database and runs schema updates on startup.
 
 ### Frontend only
 
@@ -85,79 +234,58 @@ npm install          # first time only
 npm run dev
 ```
 
-The frontend dev server starts on `http://localhost:5173`. It proxies all `/api` requests to `http://localhost:5000`, so the API must be running separately.
+The Vite dev server starts on `http://localhost:5173` and proxies all `/api` requests to `http://localhost:5000`.
 
 ### CLI
-
-The CLI is run with `dotnet run` against the `CountOrSell.Cli` project. See [CLI Reference](cli.md) for all commands.
 
 ```bash
 dotnet run --project src/CountOrSell.Cli -- <command> [options]
 ```
 
+See [CLI Reference](cli.md) for all commands.
+
 ---
 
-## Ports
+## Production build (local / self-hosted)
 
-| Service | Default port | Configurable |
-|---------|-------------|--------------|
-| API | 5000 | `--api-port` flag on startup scripts, or `--urls` / `ASPNETCORE_URLS` when running manually |
-| Frontend dev server | 5173 | `--web-port` flag on startup scripts, or `--port` passed to Vite when running manually |
-| Swagger UI | 5000 | Same as API, at `/swagger` |
-
-If port 5000 is already in use, the startup scripts will attempt to kill the conflicting process. To use a different port, pass the flags directly:
+To deploy without Docker on a server, build the frontend and publish the API:
 
 ```bash
-# Linux / macOS / Git Bash
-./start.sh --api-port 7000 --web-port 3000
-
-# Windows
-start.bat --api-port 7000 --web-port 3000
-```
-
-> **Note:** When changing the API port, the Vite proxy must also know the new address. The `--api-port` flag updates the API process only; if you run the frontend separately you will need to update `vite.config.ts` → `server.proxy['/api'].target` to match. When using the startup scripts the proxy target is not automatically updated — this is only relevant if you run the two services independently.
-
----
-
-## Environment Variables
-
-| Variable | Default | Effect |
-|----------|---------|--------|
-| `ASPNETCORE_ENVIRONMENT` | `Production` | Set to `Development` to enable Swagger UI and detailed error pages |
-| `ASPNETCORE_URLS` | `http://localhost:5000` | Override the API listen address |
-
----
-
-## Production Build
-
-To build the frontend for production:
-
-```bash
+# 1. Build the React frontend
 cd src/countorsell-web
+npm install
 npm run build
+# Output: src/countorsell-web/dist/
+
+# 2. Publish the API
+dotnet publish src/CountOrSell.Api \
+  -c Release -o ./publish/api \
+  --nologo
+
+# 3. Copy the frontend build into wwwroot
+cp -r src/countorsell-web/dist ./publish/api/wwwroot
 ```
 
-Output goes to `src/countorsell-web/dist/`. Serve those static files with any web server and configure a `/api` reverse proxy to the API.
+The API serves both the REST endpoints and the static frontend files when `ASPNETCORE_ENVIRONMENT` is not `Development`.
 
-To publish the API:
+Set the JWT key via environment variable rather than modifying `appsettings.json`:
 
 ```bash
-dotnet publish src/CountOrSell.Api \
-  -c Release \
-  -o ./publish/api \
-  --nologo
+export Jwt__Key="your-secret-key"
+export ASPNETCORE_ENVIRONMENT=Production
+./publish/api/CountOrSell.Api
 ```
-
-The `CountOrSell.db` file will be created in the same directory as the published executable on first run.
 
 ---
 
 ## Swagger / OpenAPI
 
-When running in `Development` mode, the full Swagger UI is available at:
+When `ASPNETCORE_ENVIRONMENT=Development`, the Swagger UI is available at:
 
 ```
 http://localhost:5000/swagger
 ```
 
-All API endpoints are documented there. Endpoints marked with the lock icon require a JWT bearer token. Click **Authorize** and paste `Bearer <your-token>` (the token is returned by the login or register endpoints).
+Endpoints marked with the lock icon require a JWT bearer token. Click **Authorize** and paste `Bearer <your-token>` (the token is returned by the login endpoint).
+
+To enable Swagger in Docker, add `ASPNETCORE_ENVIRONMENT=Development` to the `environment:` section of `docker-compose.yml`.

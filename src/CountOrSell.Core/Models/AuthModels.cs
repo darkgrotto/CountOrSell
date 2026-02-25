@@ -115,3 +115,52 @@ public class ChangePasswordRequest
     [JsonPropertyName("newPassword")]
     public string NewPassword { get; set; } = string.Empty;
 }
+
+public class AdminStatusInfo
+{
+    // Users
+    [JsonPropertyName("totalUsers")]
+    public int TotalUsers { get; set; }
+
+    [JsonPropertyName("activeUsers")]
+    public int ActiveUsers { get; set; }
+
+    [JsonPropertyName("disabledUsers")]
+    public int DisabledUsers { get; set; }
+
+    [JsonPropertyName("adminUsers")]
+    public int AdminUsers { get; set; }
+
+    // Card data
+    [JsonPropertyName("totalSets")]
+    public int TotalSets { get; set; }
+
+    [JsonPropertyName("totalCards")]
+    public int TotalCards { get; set; }
+
+    [JsonPropertyName("lastCardSyncedAt")]
+    public DateTime? LastCardSyncedAt { get; set; }
+
+    // Images
+    [JsonPropertyName("cardsWithImages")]
+    public int CardsWithImages { get; set; }
+
+    // Collection activity (aggregated across all users)
+    [JsonPropertyName("totalOwnershipRecords")]
+    public int TotalOwnershipRecords { get; set; }
+
+    [JsonPropertyName("totalOwnedCopies")]
+    public int TotalOwnedCopies { get; set; }
+
+    [JsonPropertyName("totalUniqueCardsOwned")]
+    public int TotalUniqueCardsOwned { get; set; }
+
+    [JsonPropertyName("reserveListCardsOwned")]
+    public int ReserveListCardsOwned { get; set; }
+
+    [JsonPropertyName("totalBoostersDefined")]
+    public int TotalBoostersDefined { get; set; }
+
+    [JsonPropertyName("totalBoostersOwned")]
+    public int TotalBoostersOwned { get; set; }
+}

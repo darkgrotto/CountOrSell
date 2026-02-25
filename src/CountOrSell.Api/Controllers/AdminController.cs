@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using CountOrSell.Core.Data;
 using CountOrSell.Core.Models;
 using CountOrSell.Core.Services;
@@ -83,6 +84,47 @@ public class AdminController : ControllerBase
         await _db.SaveChangesAsync();
 
         return Ok(new AppSettingsInfo { RegistrationsEnabled = settings.RegistrationsEnabled });
+    }
+
+    [HttpGet("status")]
+    public async Task<IActionResult> GetStatus()
+    {
+        if (!IsAdmin()) return Forbid();
+
+        var users = await _db.Users.ToListAsync();
+        var totalCards = await _db.CachedCards.CountAsync();
+        var lastSync = totalCards > 0
+            ? await _db.CachedCards.MaxAsync(c => c.LastSyncedAt)
+            : (DateTime?)null;
+
+        var ownerships = await _db.CardOwnerships
+            .Where(o => o.Quantity > 0)
+            .Select(o => new { o.ScryfallCardId, o.Quantity })
+            .ToListAsync();
+
+        var rlOwned = await _db.ReserveListCardOwnerships
+            .Where(r => r.Owned)
+            .Select(r => r.ScryfallCardId)
+            .Distinct()
+            .CountAsync();
+
+        return Ok(new AdminStatusInfo
+        {
+            TotalUsers = users.Count,
+            ActiveUsers = users.Count(u => !u.IsDisabled),
+            DisabledUsers = users.Count(u => u.IsDisabled),
+            AdminUsers = users.Count(u => u.IsAdmin),
+            TotalSets = await _db.CachedSets.CountAsync(),
+            TotalCards = totalCards,
+            LastCardSyncedAt = lastSync,
+            CardsWithImages = await _db.CachedCards.CountAsync(c => c.LocalImagePath != null && c.LocalImagePath != ""),
+            TotalOwnershipRecords = ownerships.Count,
+            TotalOwnedCopies = ownerships.Sum(o => o.Quantity),
+            TotalUniqueCardsOwned = ownerships.Select(o => o.ScryfallCardId).Distinct().Count(),
+            ReserveListCardsOwned = rlOwned,
+            TotalBoostersDefined = await _db.BoosterDefinitions.CountAsync(),
+            TotalBoostersOwned = await _db.BoosterDefinitions.CountAsync(b => b.Owned),
+        });
     }
 
     [HttpDelete("users/{id}")]
