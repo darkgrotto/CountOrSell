@@ -1,7 +1,10 @@
 using System.CommandLine;
+using System.Diagnostics;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.Json;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 using Microsoft.EntityFrameworkCore;
 using Spectre.Console;
 using Spectre.Console.Rendering;
@@ -365,12 +368,14 @@ var pubOutputDirOption = new Option<string>("--output-dir", "Output directory fo
 var pubVersionOption = new Option<string?>("--version", "Version string (default: yyyy.MM.dd.HHmm)");
 var pubDeltaFromOption = new Option<string?>("--delta-from", "Previous version to generate delta from");
 var pubBaseDbOption = new Option<string?>("--base-db", "Path to the previous version's database (required with --delta-from)");
+var pubPushOption = new Option<bool>("--push", "Upload packages to Azure Blob Storage and update the website repo");
 publishCommand.AddOption(pubOutputDirOption);
 publishCommand.AddOption(pubVersionOption);
 publishCommand.AddOption(pubDeltaFromOption);
 publishCommand.AddOption(pubBaseDbOption);
+publishCommand.AddOption(pubPushOption);
 
-publishCommand.SetHandler(async (string outputDir, string? version, string? deltaFrom, string? baseDbPath) =>
+publishCommand.SetHandler(async (string outputDir, string? version, string? deltaFrom, string? baseDbPath, bool push) =>
 {
     using var db = new CountOrSellDbContext(dbOptions);
     var ver = version ?? DateTime.UtcNow.ToString("yyyy.MM.dd.HHmm");
@@ -544,7 +549,130 @@ publishCommand.SetHandler(async (string outputDir, string? version, string? delt
     await db.SaveChangesAsync();
 
     Console.WriteLine("Publish complete!");
-}, pubOutputDirOption, pubVersionOption, pubDeltaFromOption, pubBaseDbOption);
+
+    // ── Push to Azure + update website repo ──────────────────
+    if (push)
+    {
+        var storageAccount = Environment.GetEnvironmentVariable("COS_AZURE_STORAGE_ACCOUNT");
+        var storageKey     = Environment.GetEnvironmentVariable("COS_AZURE_STORAGE_KEY");
+        var websiteRepo    = Environment.GetEnvironmentVariable("COS_WEBSITE_REPO_PATH");
+
+        if (string.IsNullOrEmpty(storageAccount) || string.IsNullOrEmpty(storageKey))
+        {
+            Console.Error.WriteLine("Error: COS_AZURE_STORAGE_ACCOUNT and COS_AZURE_STORAGE_KEY must be set for --push.");
+            return;
+        }
+        if (string.IsNullOrEmpty(websiteRepo) || !Directory.Exists(websiteRepo))
+        {
+            Console.Error.WriteLine($"Error: COS_WEBSITE_REPO_PATH must point to an existing directory. Got: '{websiteRepo}'");
+            return;
+        }
+
+        // Upload ZIPs to Azure Blob Storage ($web container, packages/ prefix)
+        var blobServiceClient = new BlobServiceClient(
+            new Uri($"https://{storageAccount}.blob.core.windows.net"),
+            new Azure.Storage.StorageSharedKeyCredential(storageAccount, storageKey));
+        var containerClient = blobServiceClient.GetBlobContainerClient("$web");
+
+        var zipFiles = Directory.GetFiles(packagesDir, "*.zip");
+        Console.WriteLine($"Uploading {zipFiles.Length} package(s) to Azure Blob Storage...");
+        foreach (var zipFile in zipFiles)
+        {
+            var blobName = $"packages/{Path.GetFileName(zipFile)}";
+            var blobClient = containerClient.GetBlobClient(blobName);
+            using var stream = File.OpenRead(zipFile);
+            await blobClient.UploadAsync(stream, new BlobUploadOptions
+            {
+                HttpHeaders = new BlobHttpHeaders { ContentType = "application/zip" },
+                TransferOptions = new Azure.Storage.StorageTransferOptions { MaximumConcurrency = 4 }
+            });
+            Console.WriteLine($"  Uploaded: {blobName}");
+        }
+
+        // Update dbupdate manifest in the website repo
+        var websiteDbupdatePath = Path.Combine(websiteRepo, "dbupdate");
+        var websitePackagesDir  = Path.Combine(websiteRepo, "packages");
+        Directory.CreateDirectory(websitePackagesDir);
+
+        // Read existing manifest (if present) and upsert new packages
+        List<object> existingPackages = new();
+        if (File.Exists(websiteDbupdatePath))
+        {
+            try
+            {
+                var existing = JsonSerializer.Deserialize<JsonElement>(await File.ReadAllTextAsync(websiteDbupdatePath));
+                if (existing.TryGetProperty("packages", out var pkgsEl))
+                {
+                    foreach (var pkg in pkgsEl.EnumerateArray())
+                        existingPackages.Add(pkg);
+                }
+            }
+            catch { /* ignore malformed existing manifest */ }
+        }
+        // Append new packages (avoid duplicates by version+type)
+        var newVersions = manifestPackages
+            .Cast<dynamic>()
+            .Select(p => $"{p.version}:{p.type}")
+            .ToHashSet();
+        var mergedPackages = existingPackages
+            .Where(p => {
+                if (p is JsonElement je)
+                {
+                    var key = $"{(je.TryGetProperty("version", out var v) ? v.GetString() : "")}:{(je.TryGetProperty("type", out var t) ? t.GetString() : "")}";
+                    return !newVersions.Contains(key);
+                }
+                return true;
+            })
+            .Concat(manifestPackages)
+            .ToList();
+
+        var websiteManifest = new { currentVersion = ver, packages = mergedPackages };
+        await File.WriteAllTextAsync(websiteDbupdatePath,
+            JsonSerializer.Serialize(websiteManifest, new JsonSerializerOptions { WriteIndented = true }));
+        Console.WriteLine($"Updated website dbupdate manifest: {websiteDbupdatePath}");
+
+        // Copy ZIPs to website repo packages/ directory
+        foreach (var zipFile in zipFiles)
+        {
+            var destPath = Path.Combine(websitePackagesDir, Path.GetFileName(zipFile));
+            File.Copy(zipFile, destPath, overwrite: true);
+            Console.WriteLine($"  Copied to website repo: {Path.GetFileName(zipFile)}");
+        }
+
+        // Git commit and push the website repo
+        Console.WriteLine("Committing and pushing website repo...");
+        static (int exitCode, string output) RunGit(string workingDir, string arguments)
+        {
+            var psi = new ProcessStartInfo("git", arguments)
+            {
+                WorkingDirectory = workingDir,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false
+            };
+            using var proc = Process.Start(psi)!;
+            var stdout = proc.StandardOutput.ReadToEnd();
+            var stderr = proc.StandardError.ReadToEnd();
+            proc.WaitForExit();
+            return (proc.ExitCode, stdout + stderr);
+        }
+
+        var (addCode, addOut) = RunGit(websiteRepo, "add dbupdate packages/");
+        if (addCode != 0) { Console.Error.WriteLine($"git add failed: {addOut}"); return; }
+
+        var (commitCode, commitOut) = RunGit(websiteRepo, $"commit -m \"Update manifest to {ver}\"");
+        if (commitCode != 0 && !commitOut.Contains("nothing to commit"))
+        {
+            Console.Error.WriteLine($"git commit failed: {commitOut}");
+            return;
+        }
+
+        var (pushCode, pushOut) = RunGit(websiteRepo, "push");
+        if (pushCode != 0) { Console.Error.WriteLine($"git push failed: {pushOut}"); return; }
+
+        Console.WriteLine("Website repo pushed — GitHub Actions will deploy automatically.");
+    }
+}, pubOutputDirOption, pubVersionOption, pubDeltaFromOption, pubBaseDbOption, pubPushOption);
 
 rootCommand.AddCommand(publishCommand);
 

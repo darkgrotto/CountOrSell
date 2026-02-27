@@ -578,6 +578,49 @@ export const api = {
     this.downloadBlob(blob, 'collection-detailed.pdf')
   },
 
+  // --- Config ---
+  async getConfig(): Promise<{
+    sphEnabled: boolean
+    sphBaseUrl: string
+    demoMode: boolean
+    demoResetAt: string | null
+  }> {
+    const response = await fetch(`${API_BASE}/config`)
+    return handleResponse(response)
+  },
+
+  // --- SPH Catalog (static/offline mode) ---
+  async getSphProducts(): Promise<unknown[]> {
+    const response = await fetch(`${API_BASE}/sphcatalog/products`, { headers: getAuthHeaders() })
+    return handleResponse(response)
+  },
+
+  async checkSphUpdate(): Promise<{
+    localVersion: string | null
+    localProductCount: number | null
+    localAppliedAt: string | null
+    remoteVersion: string | null
+    remoteProductCount: number | null
+    remoteCatalogUrl: string | null
+    updateAvailable: boolean
+    fetchError: string | null
+  }> {
+    const response = await fetch(`${API_BASE}/sphcatalog/check`, { headers: getAuthHeaders() })
+    return handleResponse(response)
+  },
+
+  async applySphUpdate(): Promise<{
+    version: string
+    productCount: number
+    appliedAt: string
+  }> {
+    const response = await fetch(`${API_BASE}/sphcatalog/apply`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    })
+    return handleResponse(response)
+  },
+
   // --- Utility ---
   downloadBlob(blob: Blob, filename: string) {
     const url = URL.createObjectURL(blob)

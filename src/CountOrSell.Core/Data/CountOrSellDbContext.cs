@@ -20,6 +20,7 @@ public class CountOrSellDbContext : DbContext
     public DbSet<UserSubmission> UserSubmissions => Set<UserSubmission>();
     public DbSet<UserSubmissionItem> UserSubmissionItems => Set<UserSubmissionItem>();
     public DbSet<SlabbedCard> SlabbedCards => Set<SlabbedCard>();
+    public DbSet<SphCatalogSnapshot> SphCatalogSnapshots => Set<SphCatalogSnapshot>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -110,6 +111,12 @@ public class CountOrSellDbContext : DbContext
             entity.HasIndex(e => e.UserId);
             entity.HasIndex(e => new { e.UserId, e.GradingCompany, e.CertificationNumber }).IsUnique();
         });
+
+        modelBuilder.Entity<SphCatalogSnapshot>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.Version).IsUnique();
+        });
     }
 
     /// <summary>
@@ -174,5 +181,16 @@ public class CountOrSellDbContext : DbContext
             )
             """);
         Database.ExecuteSqlRaw("INSERT OR IGNORE INTO AppSettings (Id, RegistrationsEnabled) VALUES (1, 1)");
+
+        // SPH catalog snapshots (downloads from sphupdate manifest)
+        Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "SphCatalogSnapshots" (
+                "Id"           INTEGER PRIMARY KEY AUTOINCREMENT,
+                "Version"      TEXT NOT NULL UNIQUE,
+                "CatalogJson"  TEXT NOT NULL,
+                "ProductCount" INTEGER NOT NULL DEFAULT 0,
+                "AppliedAt"    TEXT NOT NULL
+            )
+            """);
     }
 }

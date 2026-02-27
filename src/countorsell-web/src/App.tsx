@@ -13,6 +13,7 @@ import ProfilePage from './components/ProfilePage'
 import SettingsPage from './components/SettingsPage'
 import AdminPage from './components/AdminPage'
 import CollectionPage from './components/CollectionPage'
+import SealedProductsPage from './components/SealedProductsPage'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminRoute from './components/AdminRoute'
 import { useAuth } from './contexts/AuthContext'
@@ -24,6 +25,13 @@ function App() {
     queryKey: ['registration-status'],
     queryFn: () => api.getRegistrationStatus(),
   })
+  const { data: config } = useQuery({
+    queryKey: ['config'],
+    queryFn: () => api.getConfig(),
+  })
+  const sphEnabled = config?.sphEnabled ?? false
+  const demoMode = config?.demoMode ?? false
+  const demoResetAt = config?.demoResetAt ?? null
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -55,6 +63,9 @@ function App() {
                   <Link to="/reservelist" className="hover:text-blue-200">Reserve List</Link>
                   <Link to="/boosters" className="hover:text-blue-200">Boosters</Link>
                   <Link to="/slabbed" className="hover:text-blue-200">Slabs</Link>
+                  {sphEnabled && (
+                    <Link to="/sealed" className="hover:text-blue-200">Sealed Products</Link>
+                  )}
                 </>
               )}
               {user ? (
@@ -113,6 +124,10 @@ function App() {
         </div>
       </header>
 
+      {demoMode && (
+        <DemoBanner demoResetAt={demoResetAt} />
+      )}
+
       <main className="container mx-auto px-4 py-8">
         <Routes>
           <Route path="/" element={<SetList />} />
@@ -129,6 +144,11 @@ function App() {
           } />
           <Route path="/slabbed" element={
             <ProtectedRoute><SlabbedCardsPage /></ProtectedRoute>
+          } />
+          <Route path="/sealed" element={
+            <ProtectedRoute>
+              <SealedProductsPage sphEnabled={sphEnabled} />
+            </ProtectedRoute>
           } />
           <Route path="/profile" element={
             <ProtectedRoute><ProfilePage /></ProtectedRoute>
@@ -162,6 +182,31 @@ function App() {
           </p>
         </div>
       </footer>
+    </div>
+  )
+}
+
+function DemoBanner({ demoResetAt }: { demoResetAt: string | null }) {
+  const [timeLeft, setTimeLeft] = useState('')
+
+  useEffect(() => {
+    if (!demoResetAt) return
+    const update = () => {
+      const diff = new Date(demoResetAt).getTime() - Date.now()
+      if (diff <= 0) { setTimeLeft('resetting…'); return }
+      const m = Math.floor(diff / 60000)
+      const s = Math.floor((diff % 60000) / 1000)
+      setTimeLeft(`${m}:${s.toString().padStart(2, '0')}`)
+    }
+    update()
+    const id = setInterval(update, 1000)
+    return () => clearInterval(id)
+  }, [demoResetAt])
+
+  return (
+    <div className="bg-yellow-600 text-yellow-950 text-center py-2 px-4 text-sm font-medium">
+      Demo mode — all data resets every 15 minutes.
+      {demoResetAt && timeLeft && ` Next reset in ${timeLeft}.`}
     </div>
   )
 }

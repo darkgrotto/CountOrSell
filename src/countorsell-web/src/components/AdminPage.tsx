@@ -402,16 +402,104 @@ function StatusContent({ status }: { status: AdminStatusInfo }) {
   )
 }
 
+// ── SPH Catalog Panel ─────────────────────────────────────────────────────────
+
+function SphCatalogPanel() {
+  const queryClient = useQueryClient()
+  const { data: checkResult, isLoading: isChecking, refetch: recheckUpdate } = useQuery({
+    queryKey: ['sph-catalog-check'],
+    queryFn: () => api.checkSphUpdate(),
+    retry: false,
+  })
+
+  const applyMutation = useMutation({
+    mutationFn: () => api.applySphUpdate(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sph-catalog-check'] })
+      queryClient.invalidateQueries({ queryKey: ['sph-products'] })
+    },
+  })
+
+  return (
+    <div className="bg-white rounded-lg shadow p-4 mb-6">
+      <h2 className="text-lg font-semibold mb-3">Sealed Product Catalog</h2>
+      <p className="text-sm text-gray-500 mb-4">
+        Download the latest sealed product catalog from countorsell.com.
+        Used when SealedProdHelper is not directly connected to this instance.
+      </p>
+
+      {isChecking && <p className="text-sm text-gray-400">Checking for updates…</p>}
+
+      {checkResult && !isChecking && (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <p className="text-gray-500 text-xs mb-0.5">Local version</p>
+              <p className="font-mono font-medium">{checkResult.localVersion ?? 'None'}</p>
+              {checkResult.localProductCount != null && (
+                <p className="text-xs text-gray-400">{checkResult.localProductCount} products</p>
+              )}
+            </div>
+            <div>
+              <p className="text-gray-500 text-xs mb-0.5">Remote version</p>
+              <p className="font-mono font-medium">{checkResult.remoteVersion ?? '—'}</p>
+              {checkResult.remoteProductCount != null && (
+                <p className="text-xs text-gray-400">{checkResult.remoteProductCount} products</p>
+              )}
+            </div>
+          </div>
+
+          {checkResult.fetchError && (
+            <p className="text-xs text-red-500">Remote check failed: {checkResult.fetchError}</p>
+          )}
+
+          <div className="flex items-center gap-3 pt-1">
+            {checkResult.updateAvailable ? (
+              <button
+                onClick={() => applyMutation.mutate()}
+                disabled={applyMutation.isPending}
+                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium disabled:opacity-50"
+              >
+                {applyMutation.isPending ? 'Applying…' : 'Apply Update'}
+              </button>
+            ) : (
+              <span className="text-sm text-green-600 font-medium">✓ Up to date</span>
+            )}
+            <button
+              onClick={() => recheckUpdate()}
+              className="text-sm text-gray-500 hover:text-gray-700 underline"
+            >
+              Re-check
+            </button>
+          </div>
+
+          {applyMutation.isSuccess && (
+            <p className="text-sm text-green-600">
+              ✓ Applied version {applyMutation.data.version} ({applyMutation.data.productCount} products)
+            </p>
+          )}
+          {applyMutation.isError && (
+            <p className="text-sm text-red-500">
+              Failed: {String((applyMutation.error as Error)?.message ?? 'Unknown error')}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-type Tab = 'users' | 'status'
+type Tab = 'users' | 'status' | 'catalog'
 
 export default function AdminPage() {
   const [tab, setTab] = useState<Tab>('users')
 
   const tabs: { id: Tab; label: string }[] = [
-    { id: 'users',  label: 'Users & Settings' },
-    { id: 'status', label: 'System Status' },
+    { id: 'users',   label: 'Users & Settings' },
+    { id: 'status',  label: 'System Status' },
+    { id: 'catalog', label: 'Sealed Catalog' },
   ]
 
   return (
@@ -435,8 +523,9 @@ export default function AdminPage() {
         ))}
       </div>
 
-      {tab === 'users'  && <UsersPanel />}
-      {tab === 'status' && <StatusPanel />}
+      {tab === 'users'   && <UsersPanel />}
+      {tab === 'status'  && <StatusPanel />}
+      {tab === 'catalog' && <SphCatalogPanel />}
     </div>
   )
 }
