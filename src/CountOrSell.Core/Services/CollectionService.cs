@@ -177,6 +177,9 @@ public class CollectionService : ICollectionService
         {
             existing.Quantity = quantity;
             existing.Owned = quantity > 0;
+            if (!string.IsNullOrEmpty(cardName)) existing.CardName = cardName;
+            if (!string.IsNullOrEmpty(setCode)) existing.SetCode = setCode.ToLowerInvariant();
+            if (!string.IsNullOrEmpty(collectorNumber)) existing.CollectorNumber = collectorNumber;
             await _db.SaveChangesAsync();
             return existing;
         }
