@@ -1033,7 +1033,7 @@ async Task CreateDataOnlyDb(CountOrSellDbContext sourceDb, string outputPath)
     {
         cmd.CommandText = """
             CREATE TABLE CachedSets (
-                Id TEXT PRIMARY KEY, Code TEXT NOT NULL, Name TEXT NOT NULL,
+                Id TEXT PRIMARY KEY, Code TEXT NOT NULL UNIQUE, Name TEXT NOT NULL,
                 ReleasedAt TEXT, SetType TEXT NOT NULL, CardCount INTEGER NOT NULL,
                 IconSvgUri TEXT, ScryfallUri TEXT, LastSyncedAt TEXT NOT NULL
             );
@@ -1139,7 +1139,7 @@ async Task CreateDeltaDb(List<CachedSet> deltaSets, List<CachedCard> deltaCards,
     {
         cmd.CommandText = """
             CREATE TABLE CachedSets (
-                Id TEXT PRIMARY KEY, Code TEXT NOT NULL, Name TEXT NOT NULL,
+                Id TEXT PRIMARY KEY, Code TEXT NOT NULL UNIQUE, Name TEXT NOT NULL,
                 ReleasedAt TEXT, SetType TEXT NOT NULL, CardCount INTEGER NOT NULL,
                 IconSvgUri TEXT, ScryfallUri TEXT, LastSyncedAt TEXT NOT NULL
             );
