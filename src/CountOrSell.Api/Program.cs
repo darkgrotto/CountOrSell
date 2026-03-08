@@ -136,7 +136,7 @@ var sphApiUrl = Environment.GetEnvironmentVariable("SPH_API_URL");
 if (!string.IsNullOrEmpty(sphApiUrl))
 {
     var sphBase = sphApiUrl.TrimEnd('/');
-    app.Map("/sph", sphApp =>
+    app.MapWhen(ctx => ctx.Request.Path.StartsWithSegments("/sph"), sphApp =>
     {
         sphApp.Run(async ctx =>
         {
@@ -189,9 +189,9 @@ if (!string.IsNullOrEmpty(sphApiUrl))
 
             ctx.Response.StatusCode = (int)respMsg.StatusCode;
             foreach (var header in respMsg.Headers)
-                ctx.Response.Headers.TryAppend(header.Key, header.Value.ToArray());
+                ctx.Response.Headers.Append(header.Key, header.Value.ToArray());
             foreach (var header in respMsg.Content.Headers)
-                ctx.Response.Headers.TryAppend(header.Key, header.Value.ToArray());
+                ctx.Response.Headers.Append(header.Key, header.Value.ToArray());
 
             // Remove transfer-encoding chunked — ASP.NET handles chunking itself
             ctx.Response.Headers.Remove("transfer-encoding");
