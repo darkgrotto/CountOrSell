@@ -39,8 +39,8 @@ function Write-Banner {
     Write-Host ''
 }
 
-function Write-Section  { param($t) Write-Host "`n── $t " -ForegroundColor Cyan }
-function Write-Ok       { param($t) Write-Host "  ✓ $t"  -ForegroundColor Green }
+function Write-Section  { param($t) Write-Host "`n-- $t " -ForegroundColor Cyan }
+function Write-Ok       { param($t) Write-Host "  + $t"  -ForegroundColor Green }
 function Write-Warn     { param($t) Write-Host "  ⚠ $t"  -ForegroundColor Yellow }
 function Write-Err      { param($t) Write-Host "  ✗ $t"  -ForegroundColor Red }
 function Write-Info     { param($t) Write-Host "  · $t"  -ForegroundColor Gray }
@@ -117,7 +117,7 @@ function Wait-ForApi {
         } catch { }
         Start-Sleep 1
     }
-    Write-Warn "API did not respond within $Seconds s — you may need to change the admin password manually."
+    Write-Warn "API did not respond within $Seconds s - you may need to change the admin password manually."
     return $false
 }
 
@@ -139,7 +139,7 @@ function Set-AdminPassword {
     param([string]$BaseUrl, [string]$CurrentPwd, [string]$NewPwd)
     $token = Get-AdminToken $BaseUrl $CurrentPwd
     if (-not $token) {
-        Write-Warn "Could not log in as cosadm — password not changed."
+        Write-Warn "Could not log in as cosadm - password not changed."
         Write-Info "Log in at $BaseUrl and change it via Profile → Change Password."
         return
     }
@@ -333,7 +333,7 @@ function Install-Azure {
         $acct = az account show 2>&1 | ConvertFrom-Json
         Write-Ok "Logged in as: $($acct.user.name)"
     } catch {
-        Write-Info "Not logged in — running 'az login'..."
+        Write-Info "Not logged in - running 'az login'..."
         az login | Out-Null
         $acct = az account show 2>&1 | ConvertFrom-Json
         Write-Ok "Logged in as: $($acct.user.name)"
@@ -538,9 +538,9 @@ Write-Banner
 
 Write-Section 'Installation mode'
 if ($Mode -eq '') {
-    Write-Host "  [1] Local    — configure and run with start.sh / start.bat" -ForegroundColor White
-    Write-Host "  [2] Docker   — build a Docker image, run with docker compose" -ForegroundColor White
-    Write-Host "  [3] Azure    — deploy to Azure Container Apps" -ForegroundColor White
+    Write-Host "  [1] Local    - configure and run with start.sh / start.bat" -ForegroundColor White
+    Write-Host "  [2] Docker   - build a Docker image, run with docker compose" -ForegroundColor White
+    Write-Host "  [3] Azure    - deploy to Azure Container Apps" -ForegroundColor White
     Write-Host ''
     $choice = Read-Host '  Choose [1/2/3]'
     $Mode   = switch ($choice) {
